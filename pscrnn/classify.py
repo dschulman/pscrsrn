@@ -21,6 +21,10 @@ class Classify(pl.LightningModule):
         self.outproj = nn.Linear(
             in_features = n_hidden,
             out_features = n_classes)
+        self.train_acc = pl.metrics.Accuracy(compute_on_step=False)
+        self.val_acc = pl.metrics.Accuracy(compute_on_step=False)
+        self.train_f1 = pl.metrics.F1(average='macro', compute_on_step=False)
+        self.val_f1 = pl.metrics.F1(average='macro', compute_on_step=False)
 
     def forward(self, x, N):
         h = self.inproj(x)
@@ -31,13 +35,27 @@ class Classify(pl.LightningModule):
         x, N, y = batch
         z = self(x, N)
         loss = F.cross_entropy(z, y)
+        self.log('loss/train', loss, on_step=False, on_epoch=True)
+        self.train_acc(z, y)
+        self.train_f1(z, y)
         return loss
+
+    def training_epoch_end(self, outs):
+        self.log('acc/train', self.train_acc.compute())
+        self.log('f1/train', self.train_f1.compute())
 
     def validation_step(self, batch, batch_idx):
         x, N, y = batch
         z = self(x, N)
         loss = F.cross_entropy(z, y)
+        self.log('loss/val', loss, on_step=False, on_epoch=True)
+        self.val_acc(z, y)
+        self.val_f1(z, y)
         return loss
+
+    def validation_epoch_end(self, outs):
+        self.log('acc/val', self.val_acc.compute())
+        self.log('f1/val', self.val_f1.compute())
 
     def configure_optimizers(self):
         return optim.Adam(self.parameters(), lr=self.lr)
