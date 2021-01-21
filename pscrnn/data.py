@@ -41,13 +41,16 @@ class _Cinc2017Dataset(tud.Dataset):
 
 def _collate(batch):
     xs, Ns, ys = zip(*((torch.tensor(x), x.shape[0], y) for x, y in batch))
-    x = tnur.pad_sequence(xs, batch_first=True)
+    x = tnur.pad_sequence(xs, batch_first=True).unsqueeze(1)
     N = torch.tensor(Ns, dtype=torch.int)
-    y = torch.tensor(ys)
+    y = torch.tensor(ys, dtype=torch.long)
     N, sorted_indices = torch.sort(N, descending=True)
     return x[sorted_indices], N, y[sorted_indices]
 
 class Cinc2017Data(pl.LightningDataModule):
+    N_IN = 1
+    N_CLASSES = len(_Cinc2017Dataset._CATS)
+
     def __init__(
             self,
             url = 'https://www.physionet.org/files/challenge-2017/1.0.0/training2017.zip?download',
@@ -76,7 +79,7 @@ class Cinc2017Data(pl.LightningDataModule):
             shutil.move(os.path.join(tmp_path, 'training2017'), self.data_path)
             shutil.rmtree(tmp_path)
 
-    def setup(self):
+    def setup(self, stage=None):
         ds = _Cinc2017Dataset(self.data_path)
         gen = torch.Generator().manual_seed(self.split_seed)
         splits = []
