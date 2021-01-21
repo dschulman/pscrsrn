@@ -51,7 +51,7 @@ class Classify(pl.LightningModule):
         self.log('acc/train', self.train_acc.compute())
         self.log('f1/train', self.train_f1.compute())
         cm = self.train_cm.compute()
-        self.logger.experiment.add_figure('cm/train', self._plot_cm(cm))
+        self.logger.experiment.add_figure('cm/train', self._plot_cm(cm), self.trainer.global_step)
 
     def validation_step(self, batch, batch_idx):
         x, N, y = batch
@@ -68,7 +68,7 @@ class Classify(pl.LightningModule):
         self.log('f1/val', self.val_f1.compute())
         if not self.trainer.running_sanity_check:
             cm = self.val_cm.compute()
-            self.logger.experiment.add_figure('cm/val', self._plot_cm(cm))
+            self.logger.experiment.add_figure('cm/val', self._plot_cm(cm), self.trainer.global_step)
         else:
             self.val_cm.reset()
 
