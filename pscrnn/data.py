@@ -49,7 +49,7 @@ def _collate(batch):
 
 class Cinc2017Data(pl.LightningDataModule):
     N_IN = 1
-    N_CLASSES = len(_Cinc2017Dataset._CATS)
+    CLASSES = _Cinc2017Dataset._CATS
 
     def __init__(
             self,

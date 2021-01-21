@@ -9,7 +9,7 @@ def run(cfg):
         **cfg.get('data', {}))
     m = classify.Classify(
         n_in = dm.N_IN, 
-        n_classes = dm.N_CLASSES,
+        classes = dm.CLASSES,
         **cfg.get('model', {}))
     logger = pl.loggers.TensorBoardLogger(save_dir='.', name='')
     early_stop = pl.callbacks.EarlyStopping('loss/val', **cfg.get('early_stop', {}))
