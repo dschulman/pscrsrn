@@ -53,14 +53,15 @@ class Cinc2017Data(pl.LightningDataModule):
 
     def __init__(
             self,
+            base_path,
+            batch_size,
             url = 'https://www.physionet.org/files/challenge-2017/1.0.0/training2017.zip?download',
             data_path = 'data/cinc2017',
             train_pct = 0.7,
-            split_seed = 12345,
-            batch_size = 64):
+            split_seed = 12345):
         super().__init__()
         self.url = url
-        self.data_path = data_path
+        self.data_path = os.path.join(base_path, data_path)
         self.train_pct = train_pct
         self.split_seed = split_seed
         self.batch_size = batch_size
