@@ -1,6 +1,7 @@
 name: pscrnn
 dependencies:
   - python=3.8
+  - colorama=0.4
   - conda-forge::hydra-core=1.0
   - conda-forge::pytorch-lightning=1.1
   - cudatoolkit=10.2

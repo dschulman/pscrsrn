@@ -33,5 +33,11 @@ class Classify(pl.LightningModule):
         loss = F.cross_entropy(z, y)
         return loss
 
+    def validation_step(self, batch, batch_idx):
+        x, N, y = batch
+        z = self(x, N)
+        loss = F.cross_entropy(z, y)
+        return loss
+
     def configure_optimizers(self):
         return optim.Adam(self.parameters(), lr=self.lr)
