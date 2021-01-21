@@ -11,6 +11,8 @@ import torch.utils.data as tud
 import zipfile
 
 class _Cinc2017Dataset(tud.Dataset):
+    _CATS = ['N','A','O','~']
+
     def __init__(
             self,
             data_path = 'data/cinc2017',
@@ -18,7 +20,7 @@ class _Cinc2017Dataset(tud.Dataset):
         self.data_path = data_path
         self.ref_path = os.path.join(data_path, ref_file)
         self.ref = pd.read_csv(self.ref_path, names=['id','label'])
-        self.ref['label'] = pd.Categorical(self.ref['label'], ['N','A','O','~'])
+        self.ref['label'] = pd.Categorical(self.ref['label'], self._CATS)
         self.ref['code'] = self.ref['label'].cat.codes
 
     def __len__(self):
@@ -31,6 +33,12 @@ class _Cinc2017Dataset(tud.Dataset):
         x = (x - x.mean()) / x.std()
         return x, y
 
+    def stratify(self):
+        return [
+            tud.Subset(self, self.ref.index[self.ref['label']==c].values)
+            for c in self._CATS
+        ]
+
 def _collate(batch):
     xs, Ns, ys = zip(*((torch.tensor(x), x.shape[0], y) for x, y in batch))
     x = tnur.pad_sequence(xs, batch_first=True)
@@ -39,7 +47,7 @@ def _collate(batch):
     N, sorted_indices = torch.sort(N, descending=True)
     return x[sorted_indices], N, y[sorted_indices]
 
-class Cinc2017(pl.LightningDataModule):
+class Cinc2017Data(pl.LightningDataModule):
     def __init__(
             self,
             url = 'https://www.physionet.org/files/challenge-2017/1.0.0/training2017.zip?download',
@@ -70,13 +78,16 @@ class Cinc2017(pl.LightningDataModule):
 
     def setup(self):
         ds = _Cinc2017Dataset(self.data_path)
-        train_size = int(self.train_pct * len(ds))
-        val_size = len(ds) - train_size
-        self.train_data, self.val_data = tud.random_split(
-            dataset = ds,
-            lengths = [train_size, val_size],
-            generator = torch.Generator().manual_seed(self.split_seed))
-    
+        gen = torch.Generator().manual_seed(self.split_seed)
+        splits = []
+        for ds1 in ds.stratify():
+            train_size = int(self.train_pct * len(ds1))
+            val_size = len(ds1) - train_size
+            splits.append(tud.random_split(ds1, [train_size, val_size], gen))
+        train_datas, val_datas = zip(*splits)
+        self.train_data = tud.ConcatDataset(train_datas)
+        self.val_data = tud.ConcatDataset(val_datas)
+
     def train_dataloader(self):
         return tud.DataLoader(
             self.train_data, self.batch_size, shuffle=True,
