@@ -23,8 +23,8 @@ class Classify(pl.LightningModule):
             out_features = n_classes)
         self.train_acc = pl.metrics.Accuracy(compute_on_step=False)
         self.val_acc = pl.metrics.Accuracy(compute_on_step=False)
-        self.train_f1 = pl.metrics.F1(average='macro', compute_on_step=False)
-        self.val_f1 = pl.metrics.F1(average='macro', compute_on_step=False)
+        self.train_f1 = pl.metrics.F1(n_classes, average='macro', compute_on_step=False)
+        self.val_f1 = pl.metrics.F1(n_classes, average='macro', compute_on_step=False)
 
     def forward(self, x, N):
         h = self.inproj(x)
