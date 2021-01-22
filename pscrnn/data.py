@@ -4,6 +4,7 @@ import pandas as pd
 import pytorch_lightning as pl
 import requests
 import scipy.io as spio
+import scipy.signal as spsig
 import shutil
 import torch
 import torch.nn.utils.rnn as tnur
@@ -16,9 +17,15 @@ class _Cinc2017Dataset(tud.Dataset):
     def __init__(
             self,
             data_path = 'data/cinc2017',
-            ref_file = 'REFERENCE.csv'):
+            ref_file = 'REFERENCE.csv',
+            spectrogram = False,
+            spec_nperseg = 64,
+            spec_noverlap = 32):
         self.data_path = data_path
         self.ref_path = os.path.join(data_path, ref_file)
+        self.spectrogram = spectrogram
+        self.spec_nperseg = spec_nperseg
+        self.spec_noverlap = spec_noverlap
         self.ref = pd.read_csv(self.ref_path, names=['id','label'])
         self.ref['label'] = pd.Categorical(self.ref['label'], self._CATS)
         self.ref['code'] = self.ref['label'].cat.codes
@@ -30,6 +37,15 @@ class _Cinc2017Dataset(tud.Dataset):
         mat_id, _, y = self.ref.iloc[idx]
         mat_path = os.path.join(self.data_path, mat_id+'.mat')
         x = spio.loadmat(mat_path)['val'][0].astype(np.float32)
+        if self.spectrogram:
+            x = spsig.spectrogram(
+                x, fs=300, 
+                nperseg=self.spec_nperseg, 
+                noverlap=self.spec_noverlap)[2].T
+            x = np.abs(x)
+            x[x > 0] = np.log(x[x > 0])
+        else:
+            x = np.expand_dims(x, -1)
         x = (x - x.mean()) / x.std()
         return x, y
 
@@ -41,7 +57,7 @@ class _Cinc2017Dataset(tud.Dataset):
 
 def _collate(batch):
     xs, Ns, ys = zip(*((torch.tensor(x), x.shape[0], y) for x, y in batch))
-    x = tnur.pad_sequence(xs, batch_first=True).unsqueeze(1)
+    x = tnur.pad_sequence(xs, batch_first=True).transpose(1,2)
     N = torch.tensor(Ns, dtype=torch.int)
     y = torch.tensor(ys, dtype=torch.long)
     N, sorted_indices = torch.sort(N, descending=True)
@@ -58,13 +74,26 @@ class Cinc2017Data(pl.LightningDataModule):
             url = 'https://www.physionet.org/files/challenge-2017/1.0.0/training2017.zip?download',
             data_path = 'data/cinc2017',
             train_pct = 0.7,
-            split_seed = 12345):
+            split_seed = 12345,
+            spectrogram = False,
+            spec_nperseg = 64,
+            spec_noverlap = 32):
         super().__init__()
         self.url = url
         self.data_path = os.path.join(base_path, data_path)
         self.train_pct = train_pct
         self.split_seed = split_seed
         self.batch_size = batch_size
+        self.spectrogram = spectrogram
+        self.spec_nperseg = spec_nperseg
+        self.spec_noverlap = spec_noverlap
+
+    @property
+    def n_in(self):
+        if self.spectrogram:
+            return (self.spec_nperseg // 2) + 1
+        else:
+            return 1
 
     def prepare_data(self):
         if not os.path.exists(self.data_path):
@@ -81,7 +110,11 @@ class Cinc2017Data(pl.LightningDataModule):
             shutil.rmtree(tmp_path)
 
     def setup(self, stage=None):
-        ds = _Cinc2017Dataset(self.data_path)
+        ds = _Cinc2017Dataset(
+            data_path = self.data_path, 
+            spectrogram = self.spectrogram, 
+            spec_nperseg = self.spec_nperseg, 
+            spec_noverlap = self.spec_noverlap)
         gen = torch.Generator().manual_seed(self.split_seed)
         splits = []
         for ds1 in ds.stratify():

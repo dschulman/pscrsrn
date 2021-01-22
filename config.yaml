@@ -1,9 +1,12 @@
 data:
   batch_size: 64
+  spectrogram: False
+  spec_nperseg: 64
+  spec_noverlap: 32
 model:
   n_hidden: 32
   input_dropout: 0.0
 early_stop:
-  patience: 10
+  patience: 20
 trainer:
   gpus: 1
