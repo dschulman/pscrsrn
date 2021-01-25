@@ -29,10 +29,12 @@ def _batch_split_and_unpad(h, N):
     return [h[...,:N[0].item()] for h,N in zip(hs,Ns)]
 
 class Reduce(nn.Module):
-    def __init__(self, n_hidden, init_gate_bias=1.0):
+    def __init__(self, n_hidden, dropout=0.0, init_gate_bias=1.0):
         super().__init__()
         self.n_hidden = n_hidden
+        self.dropout = dropout
         self.init_gate_bias = init_gate_bias
+        self.drop = nn.Dropout(dropout)
         self.conv = nn.Conv1d(
             in_channels = n_hidden,
             out_channels = n_hidden * 3,
@@ -42,6 +44,7 @@ class Reduce(nn.Module):
             self.conv.bias.data[(n_hidden*2):].fill_(init_gate_bias)
 
     def _reduce(self, h):
+        h = self.drop(h)
         nh = self.n_hidden
         lrg = self.conv(h)
         l = lrg[:,:nh]

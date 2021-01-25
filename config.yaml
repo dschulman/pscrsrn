@@ -5,8 +5,9 @@ data:
   spec_noverlap: 32
 model:
   n_hidden: 32
+  dropout: 0.0
   input_dropout: 0.0
 early_stop:
-  patience: 20
+  patience: 30
 trainer:
   gpus: 1

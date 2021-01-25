@@ -8,20 +8,21 @@ import torch.optim as optim
 from . import pst
 
 class Classify(pl.LightningModule):
-    def __init__(self, n_in, classes, input_dropout=0.0, n_hidden=128, init_gate_bias=1.0, lr=1e-3):
+    def __init__(self, n_in, classes, input_dropout=0.0, n_hidden=128, dropout=0.0, init_gate_bias=1.0, lr=1e-3):
         super().__init__()
         n_classes = len(classes)
         self.classes = classes
         self.input_dropout = input_dropout
         self.n_hidden = n_hidden
+        self.dropout = dropout
         self.init_gate_bias = init_gate_bias
         self.lr = lr
+        self.indrop = nn.Dropout(
+            p = input_dropout)
         self.inproj = nn.Conv1d(
             in_channels = n_in,
             out_channels = n_hidden,
             kernel_size = 1)
-        self.indrop = nn.Dropout(
-            p = input_dropout)
         self.reduce = pst.Reduce(
             n_hidden = n_hidden,
             init_gate_bias = init_gate_bias)
@@ -36,8 +37,8 @@ class Classify(pl.LightningModule):
         self.val_cm = pl.metrics.ConfusionMatrix(n_classes, compute_on_step=False)
 
     def forward(self, x, N):
+        x = self.indrop(x)
         h = self.inproj(x)
-        h = self.indrop(h)
         h = self.reduce(h, N)
         return self.outproj(h)
     
