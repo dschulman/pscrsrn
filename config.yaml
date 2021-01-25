@@ -7,6 +7,11 @@ model:
   n_hidden: 32
   dropout: 0.0
   input_dropout: 0.0
+  lr: 1e-3
+  lr_plateau: False
+  lr_plateau_patience: 10
+  lr_plateau_factor: 0.1
+  lr_plateau_cooldown: 0
 early_stop:
   patience: 30
 trainer:

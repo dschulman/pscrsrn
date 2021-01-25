@@ -8,7 +8,11 @@ import torch.optim as optim
 from . import pst
 
 class Classify(pl.LightningModule):
-    def __init__(self, n_in, classes, input_dropout=0.0, n_hidden=128, dropout=0.0, init_gate_bias=1.0, lr=1e-3):
+    def __init__(self, 
+            n_in, classes, 
+            input_dropout=0.0, n_hidden=128, dropout=0.0, init_gate_bias=1.0, 
+            lr=1e-3, 
+            lr_plateau=False, lr_plateau_patience=10, lr_plateau_factor=0.1, lr_plateau_cooldown=0):
         super().__init__()
         n_classes = len(classes)
         self.classes = classes
@@ -17,6 +21,10 @@ class Classify(pl.LightningModule):
         self.dropout = dropout
         self.init_gate_bias = init_gate_bias
         self.lr = lr
+        self.lr_plateau = lr_plateau
+        self.lr_plateau_patience = lr_plateau_patience
+        self.lr_plateau_factor = lr_plateau_factor
+        self.lr_plateau_cooldown = lr_plateau_cooldown
         self.indrop = nn.Dropout(
             p = input_dropout)
         self.inproj = nn.Conv1d(
@@ -78,7 +86,20 @@ class Classify(pl.LightningModule):
             self.val_cm.reset()
 
     def configure_optimizers(self):
-        return optim.Adam(self.parameters(), lr=self.lr)
+        optimizer = optim.Adam(self.parameters(), lr=self.lr)
+        if self.lr_plateau:
+            sched = optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer,
+                patience = self.lr_plateau_patience,
+                factor = self.lr_plateau_factor,
+                cooldown = self.lr_plateau_cooldown)
+            return {
+                'optimizer': optimizer,
+                'lr_scheduler': sched,
+                'monitor': 'loss/val'
+            }
+        else:
+            return optimizer
 
     def _plot_cm(self, cm):
         cm = cm.cpu().detach().numpy()

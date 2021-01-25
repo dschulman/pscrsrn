@@ -12,11 +12,15 @@ def run(cfg):
         classes = dm.CLASSES,
         **cfg.get('model', {}))
     logger = pl.loggers.TensorBoardLogger(save_dir='.', name='')
-    early_stop = pl.callbacks.EarlyStopping('loss/val', **cfg.get('early_stop', {}))
-    checkpoint = pl.callbacks.ModelCheckpoint(**cfg.get('checkpoint', {}))
+    callbacks = [
+        pl.callbacks.EarlyStopping('loss/val', **cfg.get('early_stop', {})),
+        pl.callbacks.ModelCheckpoint(**cfg.get('checkpoint', {}))
+    ]
+    if cfg.get('model', {}).get('lr_plateau', False):
+        callbacks.append(pl.callbacks.LearningRateMonitor('epoch'))
     trainer = pl.Trainer(
         logger = logger,
-        callbacks = [early_stop, checkpoint],
+        callbacks = callbacks,
         **cfg.get('trainer', {}))
     trainer.fit(m, datamodule=dm)
 
