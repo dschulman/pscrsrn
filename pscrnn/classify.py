@@ -10,7 +10,8 @@ from . import pst
 class Classify(pl.LightningModule):
     def __init__(self, 
             n_in, classes, 
-            input_dropout=0.0, n_hidden=128, dropout=0.0, init_gate_bias=1.0, 
+            input_dropout=0.0, n_hidden=128, dropout=0.0, init_gate_bias=1.0,
+            loss_type='cross_entopy',
             lr=1e-3, 
             lr_plateau=False, lr_plateau_patience=10, lr_plateau_factor=0.1, lr_plateau_cooldown=0):
         super().__init__()
@@ -20,6 +21,7 @@ class Classify(pl.LightningModule):
         self.n_hidden = n_hidden
         self.dropout = dropout
         self.init_gate_bias = init_gate_bias
+        self.loss_type = loss_type
         self.lr = lr
         self.lr_plateau = lr_plateau
         self.lr_plateau_patience = lr_plateau_patience
@@ -37,6 +39,12 @@ class Classify(pl.LightningModule):
         self.outproj = nn.Linear(
             in_features = n_hidden,
             out_features = n_classes)
+        if loss_type == 'cross_entropy':
+            self.loss = nn.CrossEntropyLoss()
+        elif loss_type == 'margin':
+            self.loss = nn.MultiMarginLoss()
+        else:
+            raise ValueError(f'Unknown loss type {loss_type}')
         self.train_acc = pl.metrics.Accuracy(compute_on_step=False)
         self.val_acc = pl.metrics.Accuracy(compute_on_step=False)
         self.train_f1 = pl.metrics.F1(n_classes, average='macro', compute_on_step=False)
@@ -53,7 +61,7 @@ class Classify(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x, N, y = batch
         z = self(x, N)
-        loss = F.cross_entropy(z, y)
+        loss = self.loss(z, y)
         self.log('loss/train', loss, on_step=False, on_epoch=True)
         self.train_acc(z, y)
         self.train_f1(z, y)
@@ -69,7 +77,7 @@ class Classify(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         x, N, y = batch
         z = self(x, N)
-        loss = F.cross_entropy(z, y)
+        loss = self.loss(z, y)
         self.log('loss/val', loss, on_step=False, on_epoch=True)
         self.val_acc(z, y)
         self.val_f1(z, y)
