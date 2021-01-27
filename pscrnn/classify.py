@@ -1,3 +1,4 @@
+import hydra
 import matplotlib.pyplot as plt
 import numpy as np
 import pytorch_lightning as pl
@@ -7,13 +8,36 @@ import torch.nn.functional as F
 import torch.optim as optim
 from . import pst
 
+class ConvInproj(nn.Module):
+    def __init__(self, n_in, n_hidden, kernel_size, stride, activation):
+        super().__init__()
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.conv = nn.Conv1d(
+            in_channels = n_in,
+            out_channels = n_hidden,
+            kernel_size = kernel_size,
+            stride = stride)
+        if activation == 'identity':
+            self.act = nn.Identity()
+        elif activation == 'relu':
+            self.act = nn.ReLU()
+        else:
+            raise ValueError(f'Unknown activation {activation} for ConvInproj')
+
+    def forward(self, x, N):
+        h = self.act(self.conv(x))
+        N = torch.floor(((N - self.kernel_size) / self.stride) - 1).int()
+        return h, N
+
 class Classify(pl.LightningModule):
     def __init__(self, 
             n_in, classes, 
-            input_dropout=0.0, n_hidden=128, dropout=0.0, init_gate_bias=1.0,
-            loss_type='cross_entopy',
-            lr=1e-3, 
-            lr_plateau=False, lr_plateau_patience=10, lr_plateau_factor=0.1, lr_plateau_cooldown=0):
+            input_dropout,
+            inproj,
+            n_hidden, dropout, init_gate_bias,
+            loss_type,
+            optim, sched):
         super().__init__()
         n_classes = len(classes)
         self.classes = classes
@@ -22,17 +46,14 @@ class Classify(pl.LightningModule):
         self.dropout = dropout
         self.init_gate_bias = init_gate_bias
         self.loss_type = loss_type
-        self.lr = lr
-        self.lr_plateau = lr_plateau
-        self.lr_plateau_patience = lr_plateau_patience
-        self.lr_plateau_factor = lr_plateau_factor
-        self.lr_plateau_cooldown = lr_plateau_cooldown
+        self.optim_cfg = optim
+        self.sched_cfg = sched
         self.indrop = nn.Dropout(
             p = input_dropout)
-        self.inproj = nn.Conv1d(
-            in_channels = n_in,
-            out_channels = n_hidden,
-            kernel_size = 1)
+        self.inproj = hydra.utils.instantiate(
+            config = inproj,
+            n_in = n_in,
+            n_hidden = n_hidden)
         self.reduce = pst.Reduce(
             n_hidden = n_hidden,
             init_gate_bias = init_gate_bias)
@@ -54,7 +75,7 @@ class Classify(pl.LightningModule):
 
     def forward(self, x, N):
         x = self.indrop(x)
-        h = self.inproj(x)
+        h, N = self.inproj(x, N)
         h = self.reduce(h, N)
         return self.outproj(h)
     
@@ -94,20 +115,17 @@ class Classify(pl.LightningModule):
             self.val_cm.reset()
 
     def configure_optimizers(self):
-        optimizer = optim.Adam(self.parameters(), lr=self.lr)
-        if self.lr_plateau:
-            sched = optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer,
-                patience = self.lr_plateau_patience,
-                factor = self.lr_plateau_factor,
-                cooldown = self.lr_plateau_cooldown)
-            return {
-                'optimizer': optimizer,
-                'lr_scheduler': sched,
-                'monitor': 'loss/val'
-            }
-        else:
-            return optimizer
+        optimizer = hydra.utils.instantiate(
+            config = self.optim_cfg,
+            params = self.parameters())
+        scheduler = hydra.utils.instantiate(
+            config = self.sched_cfg,
+            optimizer = optimizer)
+        return {
+            'optimizer': optimizer,
+            'lr_scheduler': scheduler,
+            'monitor': 'loss/val'
+        }
 
     def _plot_cm(self, cm):
         cm = cm.cpu().detach().numpy()

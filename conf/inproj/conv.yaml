@@ -1,0 +1,5 @@
+# @package _group_
+_target_: pscrnn.classify.ConvInproj
+kernel_size: 8
+stride: 4
+activation: relu
