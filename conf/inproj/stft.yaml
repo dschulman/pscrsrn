@@ -1,0 +1,5 @@
+# @package _group_
+_target_: pscrnn.classify.StftInproj
+n_fft: 64
+hop_length: null
+win_length: null

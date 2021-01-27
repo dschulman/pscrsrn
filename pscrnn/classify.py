@@ -30,6 +30,37 @@ class ConvInproj(nn.Module):
         N = torch.floor(((N - self.kernel_size) / self.stride) - 1).int()
         return h, N
 
+class StftInproj(nn.Module):
+    def __init__(self, n_in, n_hidden, n_fft, hop_length, win_length):
+        super().__init__()
+        if n_in != 1:
+            raise ValueError('StftInproj only handles univariate input')
+        self.n_hidden = n_hidden
+        self.n_fft = n_fft
+        if win_length is None:
+            win_length = n_fft
+        if hop_length is None:
+            hop_length = n_fft // 4
+        self.hop_length = hop_length
+        self.win_length = win_length
+        self.swizzle = nn.Conv1d(
+            in_channels = (n_fft // 2) + 1,
+            out_channels = n_hidden,
+            kernel_size = 1)
+
+    def forward(self, x, N):
+        h = torch.stft(
+            input = x.squeeze(1),
+            n_fft = self.n_fft,
+            hop_length = self.hop_length,
+            win_length = self.win_length,
+            center = False,
+            return_complex = False)
+        h = (h ** 2).sum(dim=-1).sqrt() ## complex norm
+        h = self.swizzle(h)
+        N = (N - self.n_fft) // self.hop_length
+        return h, N
+
 class Classify(pl.LightningModule):
     def __init__(self, 
             n_in, classes, 
