@@ -1,16 +1,15 @@
 defaults:
-  - inproj: conv
+  - trans: identity
   - optim: adam
   - sched: exponential
 data:
   batch_size: 64
-  spectrogram: False
-  spec_nperseg: 64
-  spec_noverlap: 32
 model:
   n_hidden: 32
   dropout: 0.0
   input_dropout: 0.0
+  inproj_width: 4
+  inproj_stride: 2
   loss_type: cross_entropy
   init_gate_bias: 1.0
 early_stop:

@@ -6,11 +6,11 @@ from pscrnn import classify, data
 def run(cfg):
     dm = data.Cinc2017Data(
         base_path = hydra.utils.get_original_cwd(),
+        trans = hydra.utils.instantiate(cfg['trans']),
         **cfg.get('data', {}))
     m = classify.Classify(
-        n_in = dm.n_in, 
+        n_in = dm.n_features, 
         classes = dm.CLASSES,
-        inproj = cfg['inproj'],
         optim = cfg['optim'],
         sched = cfg['sched'],
         **cfg.get('model', {}))

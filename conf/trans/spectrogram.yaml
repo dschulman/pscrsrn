@@ -1,0 +1,4 @@
+# @package _group_
+_target_: pscrnn.data.SpectrogramTransform
+nperseg: 64
+noverlap: 32

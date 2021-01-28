@@ -9,5 +9,6 @@ dependencies:
   - numpy=1.19
   - pandas=1.2
   - pytorch::pytorch=1.7
+  - pywavelets=1.1
   - requests=2.25
   - scipy=1.5
