@@ -10,6 +10,7 @@ import shutil
 import torch
 import torch.nn.utils.rnn as tnur
 import torch.utils.data as tud
+import tqdm
 import zipfile
 
 class IdentityTransform:
@@ -68,7 +69,7 @@ class _Cinc2017Dataset(tud.Dataset):
         self.ref['label'] = pd.Categorical(self.ref['label'], self._CATS)
         self.ref['code'] = self.ref['label'].cat.codes
         self.xs = []
-        for mat_id in self.ref['id']:
+        for mat_id in tqdm.tqdm(self.ref['id'], desc='Loading Data'):
             mat_path = os.path.join(self.data_path, mat_id + '.mat')
             x = spio.loadmat(mat_path)['val'][0].astype(np.float32)
             x = self.trans(x)
