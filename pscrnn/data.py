@@ -67,16 +67,20 @@ class _Cinc2017Dataset(tud.Dataset):
         self.ref = pd.read_csv(self.ref_path, names=['id','label'])
         self.ref['label'] = pd.Categorical(self.ref['label'], self._CATS)
         self.ref['code'] = self.ref['label'].cat.codes
+        self.xs = []
+        for mat_id in self.ref['id']:
+            mat_path = os.path.join(self.data_path, mat_id + '.mat')
+            x = spio.loadmat(mat_path)['val'][0].astype(np.float32)
+            x = self.trans(x)
+            x = (x - x.mean()) / x.std()
+            self.xs.append(x)
 
     def __len__(self):
         return self.ref.shape[0]
 
     def __getitem__(self, idx):
-        mat_id, _, y = self.ref.iloc[idx]
-        mat_path = os.path.join(self.data_path, mat_id+'.mat')
-        x = spio.loadmat(mat_path)['val'][0].astype(np.float32)
-        x = self.trans(x)
-        x = (x - x.mean()) / x.std()
+        x = self.xs[idx]
+        _, _, y = self.ref.iloc[idx]
         return x, y
 
     def stratify(self):
