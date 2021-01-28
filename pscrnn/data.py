@@ -2,6 +2,7 @@ import numpy as np
 import os
 import pandas as pd
 import pytorch_lightning as pl
+import pywt
 import requests
 import scipy.io as spio
 import scipy.signal as spsig
@@ -36,6 +37,21 @@ class SpectrogramTransform:
     @property
     def n_features(self):
         return (self.nperseg // 2) + 1
+
+class ScalogramTransform:
+    def __init__(self, wavelet, n_scales):
+        self.wavelet = wavelet
+        self.n_scales = n_scales
+
+    def __call__(self, x):
+        rate = 300
+        cfreq = pywt.central_frequency(self.wavelet)
+        scales = cfreq * rate / (np.arange(self.n_scales) + 1)
+        return pywt.cwt(x, scales, self.wavelet, 1/rate)[0].T
+
+    @property
+    def n_features(self):
+        return self.n_scales
 
 class _Cinc2017Dataset(tud.Dataset):
     _CATS = ['N','A','O','~']
