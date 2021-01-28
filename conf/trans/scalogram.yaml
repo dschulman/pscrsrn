@@ -1,4 +1,4 @@
 # @package _group_
 _target_: pscrnn.data.ScalogramTransform
 wavelet: mexh
-n_scales: 64
+n_scales: 32
