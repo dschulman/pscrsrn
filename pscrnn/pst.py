@@ -28,18 +28,21 @@ def _batch_split_and_unpad(h, N):
     hs = torch.split(h, B.tolist(), dim=0)
     return [h[...,:N[0].item()] for h,N in zip(hs,Ns)]
 
-class Reduce(nn.Module):
-    def __init__(self, n_hidden, dropout=0.0, init_gate_bias=1.0):
+class _ReduceBase(nn.Module):
+    def __init__(self,
+            n_hidden, dropout, init_gate_bias,
+            conv_cls, kernel_size, stride, padding):
         super().__init__()
         self.n_hidden = n_hidden
         self.dropout = dropout
         self.init_gate_bias = init_gate_bias
         self.drop = nn.Dropout(dropout)
-        self.conv = nn.Conv1d(
+        self.conv = conv_cls(
             in_channels = n_hidden,
             out_channels = n_hidden * 3,
-            kernel_size = 2,
-            stride = 2)
+            kernel_size = kernel_size,
+            stride = stride,
+            padding = padding)
         if init_gate_bias is not None:
             self.conv.bias.data[(n_hidden*2):].fill_(init_gate_bias)
 
@@ -67,3 +70,29 @@ class Reduce(nn.Module):
         while h.shape[-1] > 1:
             h = self._reduce(h)
         return h.squeeze(-1)
+
+class Reduce(_ReduceBase):
+    def __init__(self, n_hidden, dropout=0.0, init_gate_bias=1.0):
+        super().__init__(
+            n_hidden = n_hidden,
+            dropout = dropout,
+            init_gate_bias = init_gate_bias,
+            conv_cls = nn.Conv1d,
+            kernel_size = 2,
+            stride = 2,
+            padding = 0)
+
+class ConvReduce(_ReduceBase):
+    def __init__(self, n_hidden,
+            dropout=0.0, init_gate_bias=1.0,
+            kernel_size = 3):
+        if kernel_size % 2 == 0:
+            raise ValueError('ConvReduce kernel_size must be odd')
+        super().__init__(
+            n_hidden = n_hidden,
+            dropout = dropout,
+            init_gate_bias = init_gate_bias,
+            conv_cls = nn.Conv2d,
+            kernel_size = (kernel_size, 2),
+            stride = (1, 2),
+            padding = ((kernel_size - 1) // 2, 0))

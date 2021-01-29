@@ -42,6 +42,48 @@ class PrnnClassify(nn.Module):
         h = self.reduce(h, N)
         return self.outproj(h)
 
+class ConvPrnnClassify(nn.Module):
+    def __init__(self,
+            n_in, n_classes,
+            input_dropout, 
+            inproj_size_h, inproj_size_w,
+            inproj_stride_h, inproj_stride_w,
+            n_hidden, dropout, init_gate_bias, kernel_size):
+        super().__init__()
+        self.input_dropout = input_dropout
+        self.inproj_size_h = inproj_size_h
+        self.inproj_size_w = inproj_size_w
+        self.inproj_stride_h = inproj_stride_h
+        self.inproj_stride_w = inproj_stride_w
+        self.n_hidden = n_hidden
+        self.dropout = dropout
+        self.init_gate_bias = init_gate_bias
+        self.indrop = nn.Dropout(
+            p = input_dropout)
+        self.inproj = nn.Conv2d(
+            in_channels = 1,
+            out_channels = n_hidden,
+            kernel_size = (inproj_size_h, inproj_size_w),
+            stride = (inproj_stride_h, inproj_stride_w))
+        self.reduce = pst.ConvReduce(
+            n_hidden = n_hidden,
+            dropout = dropout,
+            init_gate_bias = init_gate_bias,
+            kernel_size = kernel_size)
+        n_proj_features = ((n_in - inproj_size_h) // inproj_stride_h) + 1
+        self.outproj = nn.Linear(
+            in_features = n_hidden * n_proj_features,
+            out_features = n_classes)
+
+    def forward(self, x, N):
+        x = x.unsqueeze(1)
+        x = self.indrop(x)
+        h = self.inproj(x)
+        N = torch.floor(((N - self.inproj_size_w) / self.inproj_stride_w) - 1).int()
+        h = self.reduce(h, N)
+        h = h.flatten(start_dim=1)
+        return self.outproj(h)
+
 class Classify(pl.LightningModule):
     def __init__(self, 
             n_in, classes,
