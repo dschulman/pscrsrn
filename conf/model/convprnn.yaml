@@ -8,4 +8,4 @@ inproj_size_w: 4
 inproj_stride_h: 1
 inproj_stride_w: 2
 init_gate_bias: 1.0
-kernel_size: 3
+kernel_size: 5
