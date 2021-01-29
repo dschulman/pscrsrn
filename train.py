@@ -11,9 +11,10 @@ def run(cfg):
     m = classify.Classify(
         n_in = dm.n_features, 
         classes = dm.CLASSES,
+        model = cfg['model'],
+        loss_type = cfg['loss'],
         optim = cfg['optim'],
-        sched = cfg['sched'],
-        **cfg.get('model', {}))
+        sched = cfg['sched'])
     trainer = pl.Trainer(
         logger = pl.loggers.TensorBoardLogger(save_dir='.', name=''),
         callbacks = [

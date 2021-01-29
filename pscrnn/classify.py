@@ -8,25 +8,18 @@ import torch.nn.functional as F
 import torch.optim as optim
 from . import pst
 
-class Classify(pl.LightningModule):
-    def __init__(self, 
-            n_in, classes, 
+class PrnnClassify(nn.Module):
+    def __init__(self,
+            n_in, n_classes,
             input_dropout, inproj_width, inproj_stride,
-            n_hidden, dropout, init_gate_bias,
-            loss_type,
-            optim, sched):
+            n_hidden, dropout, init_gate_bias):
         super().__init__()
-        n_classes = len(classes)
-        self.classes = classes
         self.input_dropout = input_dropout
         self.inproj_width = inproj_width
         self.inproj_stride = inproj_stride
         self.n_hidden = n_hidden
         self.dropout = dropout
         self.init_gate_bias = init_gate_bias
-        self.loss_type = loss_type
-        self.optim_cfg = optim
-        self.sched_cfg = sched
         self.indrop = nn.Dropout(
             p = input_dropout)
         self.inproj = nn.Conv1d(
@@ -41,6 +34,29 @@ class Classify(pl.LightningModule):
         self.outproj = nn.Linear(
             in_features = n_hidden,
             out_features = n_classes)
+
+    def forward(self, x, N):
+        x = self.indrop(x)
+        h = self.inproj(x)
+        N = torch.floor(((N - self.inproj_width) / self.inproj_stride) - 1).int()
+        h = self.reduce(h, N)
+        return self.outproj(h)
+
+class Classify(pl.LightningModule):
+    def __init__(self, 
+            n_in, classes,
+            model, loss_type,
+            optim, sched):
+        super().__init__()
+        n_classes = len(classes)
+        self.classes = classes
+        self.loss_type = loss_type
+        self.optim_cfg = optim
+        self.sched_cfg = sched
+        self.model = hydra.utils.instantiate(
+            config = model,
+            n_in = n_in,
+            n_classes = n_classes)
         if loss_type == 'cross_entropy':
             self.loss = nn.CrossEntropyLoss()
         elif loss_type == 'margin':
@@ -55,11 +71,7 @@ class Classify(pl.LightningModule):
         self.val_cm = pl.metrics.ConfusionMatrix(n_classes, compute_on_step=False)
 
     def forward(self, x, N):
-        x = self.indrop(x)
-        h = self.inproj(x)
-        N = torch.floor(((N - self.inproj_width) / self.inproj_stride) - 1).int()
-        h = self.reduce(h, N)
-        return self.outproj(h)
+        return self.model(x, N)
     
     def training_step(self, batch, batch_idx):
         x, N, y = batch

@@ -1,17 +1,11 @@
 defaults:
-  - trans: identity
+  - trans: spectrogram
+  - model: prnn
   - optim: adam
   - sched: exponential
 data:
-  batch_size: 64
-model:
-  n_hidden: 32
-  dropout: 0.0
-  input_dropout: 0.0
-  inproj_width: 4
-  inproj_stride: 2
-  loss_type: cross_entropy
-  init_gate_bias: 1.0
+  batch_size: 32
+loss: cross_entropy
 early_stop:
   patience: 30
 trainer:
