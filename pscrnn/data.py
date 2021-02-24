@@ -95,7 +95,7 @@ def _collate(batch):
     x = tnur.pad_sequence(xs, batch_first=True).transpose(1,2)
     N = torch.tensor(Ns, dtype=torch.int)
     y = torch.tensor(ys, dtype=torch.long)
-    N, sorted_indices = torch.sort(N, descending=True)
+    N, sorted_indices = torch.sort(N)
     return x[sorted_indices], N, y[sorted_indices]
 
 class Cinc2017Data(pl.LightningDataModule):
