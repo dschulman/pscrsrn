@@ -1,5 +1,5 @@
 defaults:
-  - trans: spectrogram
+  - trans: identity
   - model: prnn
   - optim: adam
   - sched: exponential

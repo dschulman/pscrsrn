@@ -12,13 +12,14 @@ class PrnnClassify(nn.Module):
     def __init__(self,
             n_in, n_classes,
             input_dropout, inproj_width, inproj_stride,
-            n_hidden, kernel_size, dropout, init_gate_bias):
+            n_hidden, kernel_size, stride, dropout, init_gate_bias):
         super().__init__()
         self.input_dropout = input_dropout
         self.inproj_width = inproj_width
         self.inproj_stride = inproj_stride
         self.n_hidden = n_hidden
         self.kernel_size = kernel_size
+        self.stride = stride
         self.dropout = dropout
         self.init_gate_bias = init_gate_bias
         self.indrop = nn.Dropout(
@@ -31,6 +32,7 @@ class PrnnClassify(nn.Module):
         self.reduce = pst.Reduce(
             n_hidden = n_hidden,
             kernel_size = kernel_size,
+            stride = stride,
             dropout = dropout,
             init_gate_bias = init_gate_bias)
         self.outproj = nn.Linear(

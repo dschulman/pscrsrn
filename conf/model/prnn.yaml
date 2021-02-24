@@ -1,9 +1,10 @@
 # @package _group_
 _target_: pscrnn.classify.PrnnClassify
 n_hidden: 64
-kernel_size: 3
+kernel_size: 8
+stride: 4
 dropout: 0.0
 input_dropout: 0.0
-inproj_width: 4
-inproj_stride: 2
+inproj_width: 8
+inproj_stride: 4
 init_gate_bias: 1.0
