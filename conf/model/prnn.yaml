@@ -3,6 +3,7 @@ _target_: pscrnn.classify.PrnnClassify
 n_hidden: 64
 kernel_size: 8
 stride: 4
+depth_variant: false
 dropout: 0.0
 input_dropout: 0.0
 inproj_width: 8
