@@ -54,6 +54,12 @@ class Classify(pl.LightningModule):
             model, loss_type,
             optim, sched):
         super().__init__()
+        self.save_hyperparameters({
+            'model': model,
+            'loss_type': loss_type,
+            'optim': optim,
+            'sched': sched
+        })
         n_classes = len(classes)
         self.classes = classes
         self.loss_type = loss_type
