@@ -8,5 +8,7 @@ data:
 loss: cross_entropy
 early_stop:
   patience: 15
-trainer:
+train:
   gpus: 1
+train_hparam:
+  gradient_clip_val: 1.0

@@ -38,10 +38,11 @@ def run(cfg):
             pl.callbacks.ModelCheckpoint(**cfg.get('checkpoint', {})),
             pl.callbacks.LearningRateMonitor('epoch'),
             LogHparamsCallback( ## TODO shouldn't hardcode metrics
-                hparams = {'data': cfg['data'], 'trans': cfg['trans']},
+                hparams = {'data': cfg['data'], 'trans': cfg['trans'], 'train': cfg['train_hparam']},
                 metrics = {'acc/metric': 'acc/val', 'f1/metric': 'f1/val' })
         ],
-        **cfg.get('trainer', {}))
+        **cfg.get('train', {}),
+        **cfg.get('train_hparam', {}))
     trainer.fit(m, datamodule=dm)
 
 if __name__=='__main__':
