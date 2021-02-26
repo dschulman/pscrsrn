@@ -12,7 +12,7 @@ class PrnnClassify(nn.Module):
     def __init__(self,
             n_in, n_classes,
             input_dropout, inproj_width, inproj_stride,
-            n_hidden, kernel_size, stride, depth_variant, dropout, init_gate_bias):
+            n_hidden, kernel_size, stride, depth_variant, dropout):
         super().__init__()
         self.input_dropout = input_dropout
         self.inproj_width = inproj_width
@@ -22,7 +22,6 @@ class PrnnClassify(nn.Module):
         self.stride = stride
         self.depth_variant = depth_variant
         self.dropout = dropout
-        self.init_gate_bias = init_gate_bias
         self.indrop = nn.Dropout(
             p = input_dropout)
         self.inproj = nn.Conv1d(
@@ -35,8 +34,7 @@ class PrnnClassify(nn.Module):
             kernel_size = kernel_size,
             stride = stride,
             depth_variant = depth_variant,
-            dropout = dropout,
-            init_gate_bias = init_gate_bias)
+            dropout = dropout)
         self.outproj = nn.Linear(
             in_features = n_hidden,
             out_features = n_classes)

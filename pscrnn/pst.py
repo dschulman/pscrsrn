@@ -3,13 +3,18 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+def _seq_mask(x, N):
+    mask = torch.arange(x.shape[2], device=N.device).unsqueeze(0) < N.unsqueeze(1)
+    return x * mask.unsqueeze(1)
+
 class Reduce(nn.Module):
     def __init__(self,
             n_hidden, kernel_size, stride,
-            depth_variant,
-            dropout, init_gate_bias):
+            depth_variant, dropout):
         if kernel_size < 2:
-            raise ValueError("kernel_size must be >= 2")
+            raise ValueError("kernel_size must be >= 3")
+        if kernel_size % 2 == 0:
+            raise ValueError("kernel_size must be odd")
         if stride < 2:
             raise ValueError("stride must be >= 2")
         if stride > kernel_size:
@@ -20,14 +25,17 @@ class Reduce(nn.Module):
         self.stride = stride
         self.depth_variant = depth_variant
         self.dropout = dropout
-        self.init_gate_bias = init_gate_bias
-        self.conv = nn.Conv1d(
+        self.conv1 = nn.Conv1d(
             in_channels = n_hidden + (1 if depth_variant else 0),
-            out_channels = n_hidden * 3,
+            out_channels = n_hidden * 2,
             kernel_size = kernel_size,
             stride = stride)
-        if init_gate_bias is not None:
-            self.conv.bias.data[(n_hidden*2):].fill_(init_gate_bias)
+        self.conv2 = nn.Conv1d(
+            in_channels = n_hidden,
+            out_channels = n_hidden,
+            kernel_size = kernel_size,
+            padding = (kernel_size - 1) // 2)
+        self.act = nn.ReLU()
 
     def _reduce(self, h, N, depth):
         nh = self.n_hidden
@@ -36,19 +44,19 @@ class Reduce(nn.Module):
         if self.depth_variant:
             d = torch.full((h.shape[0], 1, h.shape[2]), math.log1p(depth), device=h.device)
             h = torch.cat([h, d], dim=1)
-        Nmax = h.shape[2]
-        mask = torch.arange(Nmax, device=N.device).unsqueeze(0) < N.unsqueeze(1)
-        h = h * mask.unsqueeze(1)
-        if Nmax < ks:
-            h = F.pad(h, (0, ks - Nmax))
-        elif ((Nmax - ks) % stride) != 0:
-            h = F.pad(h, (0, stride - ((Nmax - ks) % stride)))
-        lrg = self.conv(h)
-        l = lrg[:,:nh]
-        r = torch.tanh(lrg[:,nh:(nh*2)])
-        g = torch.sigmoid(lrg[:,(nh*2):])
-        h = l*g + r*(1-g)
+        h = _seq_mask(h, N)
+        if h.shape[2] < ks:
+            h = F.pad(h, (0, ks - h.shape[2]))
+        elif ((h.shape[2] - ks) % stride) != 0:
+            h = F.pad(h, (0, stride - ((h.shape[2] - ks) % stride)))
         N = torch.ceil(torch.clamp(N - ks, min=0) / stride).long() + 1
+        lr = self.conv1(h)
+        l = lr[:,:nh]
+        r = lr[:,nh:]
+        r = self.act(r)
+        r = _seq_mask(r, N)
+        r = self.conv2(r)
+        h = self.act(l + r)
         return h, N
 
     def forward(self, h, N):

@@ -7,6 +7,6 @@ data:
   batch_size: 32
 loss: cross_entropy
 early_stop:
-  patience: 30
+  patience: 15
 trainer:
   gpus: 1
