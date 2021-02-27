@@ -29,11 +29,13 @@ class Reduce(nn.Module):
             in_channels = n_hidden + (1 if depth_variant else 0),
             out_channels = n_hidden * 2,
             kernel_size = kernel_size,
-            stride = stride)
+            stride = stride,
+            padding = (kernel_size - 1) // 2)
         self.conv2 = nn.Conv1d(
             in_channels = n_hidden,
             out_channels = n_hidden,
             kernel_size = kernel_size,
+            stride = 1,
             padding = (kernel_size - 1) // 2)
         self.act = nn.ReLU()
 
@@ -45,12 +47,8 @@ class Reduce(nn.Module):
             d = torch.full((h.shape[0], 1, h.shape[2]), math.log1p(depth), device=h.device)
             h = torch.cat([h, d], dim=1)
         h = _seq_mask(h, N)
-        if h.shape[2] < ks:
-            h = F.pad(h, (0, ks - h.shape[2]))
-        elif ((h.shape[2] - ks) % stride) != 0:
-            h = F.pad(h, (0, stride - ((h.shape[2] - ks) % stride)))
-        N = torch.ceil(torch.clamp(N - ks, min=0) / stride).long() + 1
         lr = self.conv1(h)
+        N = torch.floor((N - 1) / stride).long() + 1
         l = lr[:,:nh]
         r = lr[:,nh:]
         r = self.act(r)
