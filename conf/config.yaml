@@ -2,7 +2,7 @@ defaults:
   - trans: identity
   - model: prnn
   - optim: adam
-  - sched: exponential
+  - sched: warmup_exponential
 data:
   batch_size: 32
 loss: cross_entropy

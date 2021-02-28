@@ -1,0 +1,4 @@
+# @package _group_
+_target_: pscrnn.optimx.WarmupExponentialLR
+gamma: 0.99
+warmup_epochs: 5
