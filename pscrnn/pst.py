@@ -127,7 +127,7 @@ class Classify(pl.LightningModule):
             'dropout': dropout,
             'weight_norm': weight_norm,
             'lr': lr,
-            'weight_decay': weight_norm,
+            'weight_decay': weight_decay,
             **exhparams
         })
         self.metrics = [
