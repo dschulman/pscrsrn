@@ -113,13 +113,23 @@ class Classify(pl.LightningModule):
             inproj_size=8, inproj_stride=4,
             hidden=64, kernel_size=5, stride=2, layers=2, depth_variant=True,
             dropout=0.2, weight_norm=True,
-            lr=1e-3, weight_decay=1e-2):
+            lr=1e-3, weight_decay=1e-2,
+            exhparams={}):
         super().__init__()
-        self.save_hyperparameters(
-            'inproj_size', 'inproj_stride',
-            'hidden', 'kernel_size', 'stride', 'layers', 'depth_variant',
-            'dropout', 'weight_norm',
-            'lr', 'weight_decay')
+        self.save_hyperparameters({
+            'inproj_size': inproj_size,
+            'inproj_stride': inproj_stride,
+            'hidden': hidden,
+            'kernel_size': kernel_size,
+            'stride': stride,
+            'layers': layers,
+            'depth_variant': depth_variant,
+            'dropout': dropout,
+            'weight_norm': weight_norm,
+            'lr': lr,
+            'weight_decay': weight_norm,
+            **exhparams
+        })
         self.metrics = [
             'acc/train', 'acc/val',
             'f1/train', 'f1/val']

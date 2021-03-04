@@ -3,12 +3,12 @@ import pytorch_lightning as pl
 from . import data, pst
 
 class LogHparamsCallback(pl.Callback):
-    def on_train_end(self, trainer, pl_module):
-        metrics = {
-            'm'+'/final': trainer.callback_metrics[m]
-            for m in pl_module.metrics
-        }
-        trainer.logger.log_hyperparams(pl_module.hparams, metrics)
+    def __init__(self, logger):
+        self.logger = logger
+
+    def on_train_start(self, trainer, pl_module):
+        metrics = { m: 0 for m in pl_module.metrics }
+        self.logger.log_hyperparams(pl_module.hparams, metrics)
 
 @hydra.main(config_path='../conf', config_name='default')
 def run(cfg):
@@ -18,13 +18,12 @@ def run(cfg):
     m = pst.Classify(
         features = dm.n_features,
         classes = dm.n_classes,
+        exhparams = {**dm.hparams, **cfg['train'] },
         **cfg['model'])
-    m.hparams.update(dm.hparams)
-    m.hparams.update(**cfg['train'])
     tb_logger = pl.loggers.TensorBoardLogger('.', name='', version='log', default_hp_metric=False)
     csv_logger = pl.loggers.CSVLogger('.', name='', version='log')
     ckpt_cb = pl.callbacks.ModelCheckpoint(dirpath='checkpoint')
-    hp_cb = LogHparamsCallback()
+    hp_cb = LogHparamsCallback(tb_logger)
     trainer = pl.Trainer(
         logger = [tb_logger, csv_logger],
         callbacks = [ckpt_cb, hp_cb],
