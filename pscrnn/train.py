@@ -1,6 +1,6 @@
 import hydra
 import pytorch_lightning as pl
-from . import data, pst
+from . import data, classify
 
 class LogHparamsCallback(pl.Callback):
     def __init__(self, logger):
@@ -15,7 +15,7 @@ def run(cfg):
     dm = data.Cinc2017(
         base_path = hydra.utils.get_original_cwd(),
         **cfg['data'])
-    m = pst.Classify(
+    m = classify.Classify(
         features = dm.n_features,
         classes = dm.n_classes,
         exhparams = {**dm.hparams, **cfg['train'] },
