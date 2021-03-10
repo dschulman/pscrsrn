@@ -9,7 +9,7 @@ class Classify(pl.LightningModule):
             features, classes,
             inproj_size=8, inproj_stride=4,
             hidden=64, kernel_size=5, stride=2, layers=2, depth_variant=True,
-            dropout=0.2, weight_norm=True,
+            dropout=0.2, leak=0.0, weight_norm=True,
             lr=1e-3, weight_decay=1e-2,
             exhparams={}):
         super().__init__()
@@ -21,6 +21,7 @@ class Classify(pl.LightningModule):
             'stride': stride,
             'layers': layers,
             'depth_variant': depth_variant,
+            'leak': leak,
             'dropout': dropout,
             'weight_norm': weight_norm,
             'lr': lr,
@@ -45,6 +46,7 @@ class Classify(pl.LightningModule):
             stride = stride,
             layers = layers,
             depth_variant = depth_variant,
+            leak = leak,
             dropout = dropout,
             weight_norm = weight_norm)
         self.outproj = nn.Linear(

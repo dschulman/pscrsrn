@@ -11,6 +11,7 @@ model:
   stride: 2
   layers: 2
   depth_variant: True
+  leak: 0.0
   dropout: 0.2
   weight_norm: True
   lr: 0.001
