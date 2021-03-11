@@ -1,8 +1,9 @@
+import hydra
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from . import pst
+from . import data, plx, pst
 
 class Classify(pl.LightningModule):
     def __init__(self,
@@ -95,3 +96,27 @@ class Classify(pl.LightningModule):
             params = self.parameters(), 
             lr = self.lr,
             weight_decay = self.weight_decay)
+
+@hydra.main(config_path='../conf', config_name='classify')
+def run(cfg):
+    dm = data.Cinc2017(
+        base_path = hydra.utils.get_original_cwd(),
+        **cfg['data'])
+    m = Classify(
+        features = dm.n_features,
+        classes = dm.n_classes,
+        exhparams = {**dm.hparams, **cfg['train'] },
+        **cfg['model'])
+    tb_logger = pl.loggers.TensorBoardLogger('.', name='', version='log', default_hp_metric=False)
+    csv_logger = pl.loggers.CSVLogger('.', name='', version='log')
+    ckpt_cb = pl.callbacks.ModelCheckpoint(dirpath='checkpoint')
+    hp_cb = plx.LogHparamsCallback(tb_logger)
+    trainer = pl.Trainer(
+        logger = [tb_logger, csv_logger],
+        callbacks = [ckpt_cb, hp_cb],
+        gpus=1,
+        **cfg['train'])
+    trainer.fit(model=m, datamodule=dm)
+
+if __name__=='__main__':
+    run()
