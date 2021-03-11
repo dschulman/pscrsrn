@@ -4,7 +4,7 @@ import torch
 import torch.distributions as dists
 import torch.nn as nn
 import torch.optim as optim
-from . import data, generate, plx, pst
+from . import data, generate, pst
 
 class Encoder(nn.Module):
     def __init__(self,
@@ -163,13 +163,12 @@ def run(cfg):
         features = dm.n_features,
         exhparams = {**dm.hparams, **cfg['train'] },
         **cfg['model'])
-    tb_logger = pl.loggers.TensorBoardLogger('.', name='', version='log', default_hp_metric=False)
+    tb_logger = pl.loggers.TensorBoardLogger('.', name='', version='log')
     csv_logger = pl.loggers.CSVLogger('.', name='', version='log')
     ckpt_cb = pl.callbacks.ModelCheckpoint(dirpath='checkpoint')
-    hp_cb = plx.LogHparamsCallback(tb_logger)
     trainer = pl.Trainer(
         logger = [tb_logger, csv_logger],
-        callbacks = [ckpt_cb, hp_cb],
+        callbacks = [ckpt_cb],
         gpus=1,
         **cfg['train'])
     trainer.fit(model=m, datamodule=dm)
