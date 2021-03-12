@@ -7,8 +7,6 @@ import torch.nn.utils.rnn as tnur
 class _SeqConvBase(nn.Module):
     def __init__(self, conv_cls, 
             in_channels, out_channels, kernel_size, stride, pad_delta, weight_norm):
-        if kernel_size < 3:
-            raise ValueError('kernel_size should be >= 3')
         if (kernel_size % 2) == 0:
             raise ValueError('kernel_size should be odd')
         if stride > kernel_size:
