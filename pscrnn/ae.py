@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.optim as optim
 from . import data, encdec, plx
 
-class VAE(pl.LightningModule):
+class AE(pl.LightningModule):
     def __init__(self,
             features, latent,
             inproj_size=8, inproj_stride=4,
@@ -15,7 +15,6 @@ class VAE(pl.LightningModule):
             dec_hidden=64, dec_kernel_size=5, dec_stride=2, dec_layers=2, dec_depth_variant=True,
             dec_dropout=0.0, dec_leak=0.2, dec_weight_norm=True,
             outproj_size=5,
-            kl_coeff=0.1,
             lr=1e-3, weight_decay=1e-2,
             exhparams={}):
         super().__init__()
@@ -40,23 +39,20 @@ class VAE(pl.LightningModule):
             'dec_leak': dec_leak,
             'dec_weight_norm': dec_weight_norm,
             'outproj_size': outproj_size,
-            'kl_coeff': kl_coeff,
             'lr': lr,
             'weight_decay': weight_decay,
             **exhparams
         })
         self.metrics = [
-            'loss/val',
-            'recon_loss/val',
-            'kl_loss/val'
+            'loss/train',
+            'loss/val'
         ]
         self.latent = latent
-        self.kl_coeff = kl_coeff
         self.lr = lr
         self.weight_decay = weight_decay
         self.encoder = encdec.Encode(
             features = features,
-            latent = latent*2,
+            latent = latent,
             inproj_size = inproj_size,
             inproj_stride = inproj_stride,
             hidden = enc_hidden,
@@ -79,33 +75,20 @@ class VAE(pl.LightningModule):
             dropout = dec_dropout,
             weight_norm = dec_weight_norm,
             outproj_size = outproj_size)
-        self.recon_loss = nn.MSELoss(reduction='none')
+        self.loss = nn.MSELoss(reduction='none')
 
     def forward(self, x, N):
-        nl = self.latent
-        muvar = self.encoder(x, N)
-        mu = muvar[:,:nl]
-        logvar = muvar[:,nl:]
-        std = torch.exp(logvar / 2)
-        p = dists.Normal(torch.zeros_like(mu), torch.ones_like(std))
-        q = dists.Normal(mu, std)
-        z = q.rsample()
-        log_pz = p.log_prob(z)
-        log_qz = q.log_prob(z)
+        z = self.encoder(x, N)
         y = self.decoder(z, N)
-        return y, log_pz, log_qz
+        return y
 
     def step(self, batch, batch_idx, log_suffix):
         x, N, _ = batch
-        y, log_pz, log_qz = self(x, N)
+        y = self(x, N)
         mask = torch.arange(x.shape[2], device=N.device) < N.unsqueeze(1)
-        recon_loss = self.recon_loss(y, x) * mask.unsqueeze(1)
-        recon_loss = torch.sum(recon_loss) / torch.sum(N) / x.shape[1]
-        kl_loss = torch.mean(log_qz - log_pz)
-        loss = recon_loss + (self.kl_coeff * kl_loss)
+        loss = self.loss(y, x) * mask.unsqueeze(1)
+        loss = torch.sum(loss) / torch.sum(N) / x.shape[1]
         self.log(f'loss/{log_suffix}', loss, on_step=False, on_epoch=True)
-        self.log(f'recon_loss/{log_suffix}', recon_loss, on_step=False, on_epoch=True)
-        self.log(f'kl_loss/{log_suffix}', kl_loss, on_step=False, on_epoch=True)
         return loss
 
     def training_step(self, batch, batch_idx):
@@ -120,12 +103,12 @@ class VAE(pl.LightningModule):
             lr = self.lr,
             weight_decay = self.weight_decay)
 
-@hydra.main(config_path='../conf', config_name='vae')
+@hydra.main(config_path='../conf', config_name='ae')
 def run(cfg):
     dm = data.Cinc2017(
         base_path = hydra.utils.get_original_cwd(),
         **cfg['data'])
-    m = VAE(
+    m = AE(
         features = dm.n_features,
         exhparams = {**dm.hparams, **cfg['train'] },
         **cfg['model'])

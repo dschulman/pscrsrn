@@ -3,7 +3,7 @@ import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from . import data, plx, pst
+from . import data, encdec, plx
 
 class Classify(pl.LightningModule):
     def __init__(self,
@@ -32,16 +32,13 @@ class Classify(pl.LightningModule):
         self.metrics = [
             'acc/train', 'acc/val',
             'f1/train', 'f1/val']
-        self.inproj_size = inproj_size
-        self.inproj_stride = inproj_stride
         self.lr = lr
         self.weight_decay = weight_decay
-        self.inproj = nn.Conv1d(
-            in_channels = features,
-            out_channels = hidden,
-            kernel_size = inproj_size,
-            stride = inproj_stride)
-        self.reduce = pst.Reduce(
+        self.encode = encdec.Encode(
+            features = features,
+            latent = classes,
+            inproj_size = inproj_size,
+            inproj_stride = inproj_stride,
             hidden = hidden,
             kernel_size = kernel_size,
             stride = stride,
@@ -50,9 +47,6 @@ class Classify(pl.LightningModule):
             leak = leak,
             dropout = dropout,
             weight_norm = weight_norm)
-        self.outproj = nn.Linear(
-            in_features = hidden,
-            out_features = classes)
         self.loss = nn.CrossEntropyLoss()
         self.train_acc = pl.metrics.Accuracy(compute_on_step=False)
         self.val_acc = pl.metrics.Accuracy(compute_on_step=False)
@@ -60,10 +54,7 @@ class Classify(pl.LightningModule):
         self.val_f1 = pl.metrics.F1(classes, average='macro', compute_on_step=False)
 
     def forward(self, x, N):
-        h = self.inproj(x)
-        N = torch.floor(((N - self.inproj_size) / self.inproj_stride) - 1).long()
-        h = self.reduce(h, N)
-        return self.outproj(h)
+        return self.encode(x, N)
 
     def training_step(self, batch, batch_idx):
         x, N, y = batch
