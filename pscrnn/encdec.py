@@ -31,7 +31,7 @@ class Encode(nn.Module):
 
     def forward(self, x, N):
         h = self.inproj(x)
-        N = torch.floor(((N - self.inproj_size) / self.inproj_stride) - 1).long()
+        N = torch.floor(((N - self.inproj_size) / self.inproj_stride) + 1).long()
         h = self.reduce(h, N)
         return self.outproj(h)
 
