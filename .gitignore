@@ -1,6 +1,5 @@
 /.vscode
 /data
-/env
 /outputs
 /multirun
 __pycache__
