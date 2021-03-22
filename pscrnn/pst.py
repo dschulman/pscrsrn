@@ -83,16 +83,21 @@ class Block(nn.Module):
             weight_norm = weight_norm)
         self.act = nn.LeakyReLU(leak) if leak > 0 else nn.ReLU()
 
-    def forward(self, h, N, depth):
-        c = self.channels
+    def _depth_cat(self, h, depth):
         if self.depth_variant:
             dshape = (h.shape[0], 1, h.shape[2])
             d = torch.full(dshape, math.log1p(depth), device=h.device)
             h = torch.cat([h,d], dim=1)
+        return h
+
+    def forward(self, h, N, depth):
+        c = self.channels
+        h = self._depth_cat(h, depth)
         lr, N = self.conv1(h, N)
         l = lr[:,:c]
         r = lr[:,c:]
         r = self.act(r)
+        r = self._depth_cat(r, depth)
         r, _ = self.conv2(r, N)
         return self.act(l + r), N
 
