@@ -19,6 +19,7 @@ model:
   leak: 0.0
   dropout: 0.2
   weight_norm: True
+  layer_norm: True
   lr: 0.001
   weight_decay: 0.01
 train:

@@ -11,9 +11,9 @@ class AE(pl.LightningModule):
             features, latent,
             inproj_size=8, inproj_stride=4,
             enc_hidden=64, enc_kernel_size=5, enc_stride=2, enc_layers=2, enc_depth_variant=True,
-            enc_dropout=0.0, enc_leak=0.0, enc_weight_norm=True,
+            enc_dropout=0.0, enc_leak=0.0, enc_weight_norm=True, enc_layer_norm=True,
             dec_hidden=64, dec_kernel_size=5, dec_stride=2, dec_layers=2, dec_depth_variant=True,
-            dec_dropout=0.0, dec_leak=0.2, dec_weight_norm=True,
+            dec_dropout=0.0, dec_leak=0.2, dec_weight_norm=True, dec_layer_norm=True,
             outproj_size=5,
             lr=1e-3, weight_decay=1e-2,
             exhparams={}):
@@ -30,6 +30,7 @@ class AE(pl.LightningModule):
             'enc_leak': enc_leak,
             'enc_dropout': enc_dropout,
             'enc_weight_norm': enc_weight_norm,
+            'enc_layer_norm': enc_layer_norm,
             'dec_hidden': dec_hidden,
             'dec_kernel_size': dec_kernel_size,
             'dec_stride': dec_stride,
@@ -38,6 +39,7 @@ class AE(pl.LightningModule):
             'dec_dropout': dec_dropout,
             'dec_leak': dec_leak,
             'dec_weight_norm': dec_weight_norm,
+            'dec_layer_norm': dec_layer_norm,
             'outproj_size': outproj_size,
             'lr': lr,
             'weight_decay': weight_decay,
@@ -62,7 +64,8 @@ class AE(pl.LightningModule):
             depth_variant = enc_depth_variant,
             leak = enc_leak,
             dropout = enc_dropout,
-            weight_norm = enc_weight_norm)
+            weight_norm = enc_weight_norm,
+            layer_norm = enc_layer_norm)
         self.decoder = encdec.Decode(
             features = features,
             latent = latent,
@@ -74,6 +77,7 @@ class AE(pl.LightningModule):
             leak = dec_leak,
             dropout = dec_dropout,
             weight_norm = dec_weight_norm,
+            layer_norm = dec_layer_norm,
             outproj_size = outproj_size)
         self.loss = nn.MSELoss(reduction='none')
 

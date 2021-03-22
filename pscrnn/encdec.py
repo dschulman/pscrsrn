@@ -7,7 +7,7 @@ class Encode(nn.Module):
             features, latent,
             inproj_size=8, inproj_stride=4,
             hidden=64, kernel_size=5, stride=2, layers=2, depth_variant=True,
-            dropout=0.0, leak=0.0, weight_norm=True):
+            dropout=0.0, leak=0.0, weight_norm=True, layer_norm=True):
         super().__init__()
         self.inproj_size = inproj_size
         self.inproj_stride = inproj_stride
@@ -24,7 +24,8 @@ class Encode(nn.Module):
             depth_variant = depth_variant,
             dropout = dropout,
             leak = leak,
-            weight_norm = weight_norm)
+            weight_norm = weight_norm,
+            layer_norm = layer_norm)
         self.outproj = nn.Linear(
             in_features = hidden,
             out_features = latent)
@@ -39,7 +40,7 @@ class Decode(nn.Module):
     def __init__(self,
             features, latent,
             hidden=64, kernel_size=5, stride=2, layers=2, depth_variant=True,
-            dropout=0.0, leak=0.2, weight_norm=True,
+            dropout=0.0, leak=0.2, weight_norm=True, layer_norm=True,
             outproj_size=5):
         super().__init__()
         self.inproj = nn.Linear(
@@ -53,7 +54,8 @@ class Decode(nn.Module):
             depth_variant = depth_variant,
             dropout = dropout,
             leak = leak,
-            weight_norm = weight_norm)
+            weight_norm = weight_norm,
+            layer_norm = layer_norm)
         self.outproj = pst.SeqConv(
             in_channels = hidden,
             out_channels = features,
