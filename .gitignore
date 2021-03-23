@@ -3,3 +3,9 @@
 /outputs
 /multirun
 __pycache__
+/notes/*.aux
+/notes/*.fdb_latexmk
+/notes/*.fls
+/notes/*.log
+/notes/*.pdf
+/notes/*.synctex.gz

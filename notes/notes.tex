@@ -1,0 +1,24 @@
+\documentclass{article}
+
+\title{Physiological Signal Classification with Recursive Sequence Reduction}
+\author{Daniel Schulman}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+
+Classification of physiological signals, such as electromyography (EMG), electroencephalography (EEG), and electrocardiography (ECG), is a common task in applications of artificial intelligence and machine learning to healthcare.
+In the last few years, deep learning models have become state-of-the-art in many physiological signal classification tasks, in several cases achieving performance superior to human experts.
+
+Physiological signals differ from many of the domains that deep learning models were originally developed on, such as computer vision.
+They typically have fairly high temporal resolution, so that even brief recordings of signals have many more samples than other types of sequential data (e.g. natural language).
+Signal length often varies, and models that are designed around data with fixed dimensionality (e.g. CNNs) can be awkward.
+
+In this paper, we introduce a novel approach --- a \emph{recursive sequence reduction network} (RSRNs) --- that provides a simple baseline approach that is well-suited to physiological signal classification tasks.
+RSRNs handle long sequences and varying-length sequence, and can deliver competitive performance with relatively small models, which may make usage feasible on edge devices with limited memory or computational power.
+
+We first introduce RSRNs, then present experiments demonstrating performance on a set of benchmark tasks.
+We compare and contrast RSRNs to other models, and we discuss applications where RSRNs may be suitable.
+
+\end{document}
