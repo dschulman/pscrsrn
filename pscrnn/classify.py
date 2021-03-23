@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torchmetrics as tmet
 from . import data, pst, train
 
 def main():
@@ -14,7 +15,13 @@ def main():
         default_conf = 'default.yaml',
         model_con = m,
         data_con = d,
-        loss_con = nn.CrossEntropyLoss)
+        loss_con = nn.CrossEntropyLoss,
+        metrics = {
+            'accuracy': tmet.Accuracy(compute_on_step=False),
+            'f1': tmet.F1(d.n_classes, average='macro', compute_on_step=False),
+            'precision': tmet.Precision(d.n_classes, average='macro', compute_on_step=False),
+            'recall': tmet.Recall(d.n_classes, average='macro', compute_on_step=False)
+        })
 
 if __name__ == '__main__':
     main()
