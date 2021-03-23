@@ -1,115 +1,20 @@
-import hydra
-import pytorch_lightning as pl
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from . import data, encdec, plx
+from . import data, pst, train
 
-class Classify(pl.LightningModule):
-    def __init__(self,
-            features, classes,
-            inproj_size=8, inproj_stride=4,
-            hidden=64, kernel_size=5, stride=2, layers=2, depth_variant=True,
-            dropout=0.2, leak=0.0, weight_norm=True, layer_norm=True,
-            lr=1e-3, weight_decay=1e-2,
-            exhparams={}):
-        super().__init__()
-        self.save_hyperparameters({
-            'inproj_size': inproj_size,
-            'inproj_stride': inproj_stride,
-            'hidden': hidden,
-            'kernel_size': kernel_size,
-            'stride': stride,
-            'layers': layers,
-            'depth_variant': depth_variant,
-            'leak': leak,
-            'dropout': dropout,
-            'weight_norm': weight_norm,
-            'layer_norm': layer_norm,
-            'lr': lr,
-            'weight_decay': weight_decay,
-            **exhparams
-        })
-        self.metrics = [
-            'acc/train', 'acc/val',
-            'f1/train', 'f1/val']
-        self.lr = lr
-        self.weight_decay = weight_decay
-        self.encode = encdec.Encode(
-            features = features,
-            latent = classes,
-            inproj_size = inproj_size,
-            inproj_stride = inproj_stride,
-            hidden = hidden,
-            kernel_size = kernel_size,
-            stride = stride,
-            layers = layers,
-            depth_variant = depth_variant,
-            leak = leak,
-            dropout = dropout,
-            weight_norm = weight_norm,
-            layer_norm = layer_norm)
-        self.loss = nn.CrossEntropyLoss()
-        self.train_acc = pl.metrics.Accuracy(compute_on_step=False)
-        self.val_acc = pl.metrics.Accuracy(compute_on_step=False)
-        self.train_f1 = pl.metrics.F1(classes, average='macro', compute_on_step=False)
-        self.val_f1 = pl.metrics.F1(classes, average='macro', compute_on_step=False)
+def main():
+    d = data.Cinc2017()
+    def m(**hparams):
+        return pst.Classify(
+            features = d.n_features, 
+            classes = d.n_classes,
+            **hparams)
+    train.run(
+        default_out = 'outputs',
+        default_conf = 'default.yaml',
+        model_con = m,
+        data_con = d,
+        loss_con = nn.CrossEntropyLoss)
 
-    def forward(self, x, N):
-        return self.encode(x, N)
-
-    def training_step(self, batch, batch_idx):
-        x, N, y = batch
-        z = self(x, N)
-        loss = self.loss(z, y)
-        self.log('loss/train', loss, on_step=False, on_epoch=True)
-        self.train_acc(torch.argmax(z, dim=1), y)
-        self.train_f1(z, y)
-        return loss
-
-    def training_epoch_end(self, outs):
-        self.log('acc/train', self.train_acc.compute())
-        self.log('f1/train', self.train_f1.compute())
-
-    def validation_step(self, batch, batch_idx):
-        x, N, y = batch
-        z = self(x, N)
-        loss = self.loss(z, y)
-        self.log('loss/val', loss, on_step=False, on_epoch=True)
-        self.val_acc(torch.argmax(z, dim=1), y)
-        self.val_f1(z, y)
-        return loss
-
-    def validation_epoch_end(self, outs):
-        self.log('acc/val', self.val_acc.compute())
-        self.log('f1/val', self.val_f1.compute())
-
-    def configure_optimizers(self):
-        return optim.AdamW(
-            params = self.parameters(), 
-            lr = self.lr,
-            weight_decay = self.weight_decay)
-
-@hydra.main(config_path='../conf', config_name='classify')
-def run(cfg):
-    dm = data.Cinc2017(
-        base_path = hydra.utils.get_original_cwd(),
-        **cfg['data'])
-    m = Classify(
-        features = dm.n_features,
-        classes = dm.n_classes,
-        exhparams = {**dm.hparams, **cfg['train'] },
-        **cfg['model'])
-    tb_logger = pl.loggers.TensorBoardLogger('.', name='', version='log', default_hp_metric=False)
-    csv_logger = pl.loggers.CSVLogger('.', name='', version='log')
-    ckpt_cb = pl.callbacks.ModelCheckpoint(dirpath='checkpoint')
-    tbhp_cb = plx.TboardHParamsCallback(tb_logger)
-    trainer = pl.Trainer(
-        logger = [tb_logger, csv_logger],
-        callbacks = [ckpt_cb, tbhp_cb],
-        gpus=1,
-        **cfg['train'])
-    trainer.fit(model=m, datamodule=dm)
-
-if __name__=='__main__':
-    run()
+if __name__ == '__main__':
+    main()

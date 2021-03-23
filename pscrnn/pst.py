@@ -233,3 +233,37 @@ class Expand(nn.Module):
         offset = (M - N_orig) // 2
         hs = [hi.T[oi:(oi+Ni)] for hi, oi, Ni in zip(out_h, offset, N_orig)]
         return tnur.pad_sequence(hs, batch_first=True).transpose(1,2)
+
+class Classify(nn.Module):
+    def __init__(self,
+            features, classes,
+            inproj_size=8, inproj_stride=4,
+            hidden=64, kernel_size=5, stride=2, layers=2, depth_variant=True,
+            dropout=0.2, leak=0.0, weight_norm=True, layer_norm=True):
+        super().__init__()
+        self.inproj_size = inproj_size
+        self.inproj_stride = inproj_stride
+        self.inproj = nn.Conv1d(
+            in_channels = features,
+            out_channels = hidden,
+            kernel_size = inproj_size,
+            stride = inproj_stride)
+        self.reduce = Reduce(
+            hidden = hidden,
+            kernel_size = kernel_size,
+            stride = stride,
+            layers = layers,
+            depth_variant = depth_variant,
+            dropout = dropout,
+            leak = leak,
+            weight_norm = weight_norm,
+            layer_norm = layer_norm)
+        self.outproj = nn.Linear(
+            in_features = hidden,
+            out_features = classes)
+
+    def forward(self, x, N):
+        h = self.inproj(x)
+        N = torch.floor(((N - self.inproj_size) / self.inproj_stride) + 1).long()
+        h = self.reduce(h, N)
+        return self.outproj(h)

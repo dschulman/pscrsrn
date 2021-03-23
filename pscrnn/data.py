@@ -1,7 +1,6 @@
 import numpy as np
 import os
 import pandas as pd
-import pytorch_lightning as pl
 import requests
 import scipy.io as spio
 import scipy.signal as spsig
@@ -32,37 +31,19 @@ class Cinc2017Dataset(tud.Dataset):
             x = x[offset:(offset+trimmed)]
         return x, self.y[idx]
 
-class Cinc2017(pl.LightningDataModule):
+class Cinc2017:
     CATS = ['N','A','O','~']
     URL = 'https://www.physionet.org/files/challenge-2017/1.0.0/training2017.zip?download'
     PATH = 'data/cinc2017'
 
-    def __init__(self,
-            base_path,
-            batch_size = 32,
-            trim_prob = 0.9,
-            trim_min = 0.5,
-            balanced_sampling = True,
-            train_pct = 0.7,
-            split_seed = 1234):
-        super().__init__()
+    def __init__(self, base_path='.', train_pct=0.7, split_seed=1234):
         self.path = os.path.join(base_path, self.PATH)
-        self.batch_size = batch_size
-        self.trim_prob = trim_prob
-        self.trim_min = trim_min
-        self.balanced_sampling = balanced_sampling
         self.train_pct = train_pct
         self.split_seed = split_seed
-        self.hparams = {
-            'batch_size': batch_size,
-            'trim_prob': trim_prob,
-            'trim_min': trim_min,
-            'balanced_sampling': balanced_sampling
-        }
         self.n_features = 1
         self.n_classes = len(self.CATS)
 
-    def prepare_data(self):
+    def _download(self):
         if not os.path.exists(self.path):
             tmp_path = self.path + '_tmp'
             os.makedirs(tmp_path, exist_ok=True)
@@ -79,7 +60,7 @@ class Cinc2017(pl.LightningDataModule):
             shutil.move(os.path.join(tmp_path, 'training2017'), self.path)
             shutil.rmtree(tmp_path)
 
-    def setup(self, stage=None):
+    def _setup(self, trim_prob, trim_min):
         ref_path = os.path.join(self.path, 'REFERENCE.csv')
         ref = pd.read_csv(ref_path, names=['id','label'])
         xs = []
@@ -106,12 +87,13 @@ class Cinc2017(pl.LightningDataModule):
         train_indices.sort()
         val_indices = np.concatenate(val_indices)
         val_indices.sort()
-        self.train_ds = Cinc2017Dataset(
+        train_ds = Cinc2017Dataset(
             xs[train_indices], y[train_indices], weights[train_indices],
-            trim_prob = self.trim_prob, trim_min = self.trim_min)
-        self.val_ds = Cinc2017Dataset(
+            trim_prob = trim_prob, trim_min = trim_min)
+        val_ds = Cinc2017Dataset(
             xs[val_indices], y[val_indices], weights[val_indices],
             trim_prob = 0.0)
+        return train_ds, val_ds
 
     @staticmethod
     def _collate(batch):
@@ -122,21 +104,27 @@ class Cinc2017(pl.LightningDataModule):
         N, sorted_indices = torch.sort(N)
         return x[sorted_indices], N, y[sorted_indices]
 
-    def train_dataloader(self):
-        tds = self.train_ds
-        if self.balanced_sampling:
+    def _train_dataloader(self, train_ds, batch_size, balanced_sampling):
+        if balanced_sampling:
             return tud.DataLoader(
-                tds, self.batch_size,
-                sampler = tud.WeightedRandomSampler(tds.weights, len(tds)),
+                train_ds, batch_size,
+                sampler = tud.WeightedRandomSampler(train_ds.weights, len(train_ds)),
                 collate_fn = self._collate)
         else:
             return tud.DataLoader(
-                tds, self.batch_size,
+                train_ds, batch_size,
                 shuffle = True,
                 collate_fn = self._collate)
 
-    def val_dataloader(self):
+    def _val_dataloader(self, val_ds, batch_size):
         return tud.DataLoader(
-            self.val_ds, self.batch_size,
+            val_ds, batch_size,
             shuffle = False,
             collate_fn = self._collate)
+
+    def __call__(self, batch_size, trim_prob, trim_min, balanced_sampling):
+        self._download()
+        train_ds, val_ds = self._setup(trim_prob, trim_min)
+        train_dl = self._train_dataloader(train_ds, batch_size, balanced_sampling)
+        val_dl = self._val_dataloader(val_ds, batch_size)
+        return train_dl, val_dl
