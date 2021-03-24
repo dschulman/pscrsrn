@@ -1,5 +1,10 @@
 \documentclass{article}
 
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+\newcommand{\real}{\mathbb{R}}
+
 \title{Physiological Signal Classification with Recursive Sequence Reduction}
 \author{Daniel Schulman}
 
@@ -20,5 +25,25 @@ RSRNs handle long sequences and varying-length sequence, and can deliver competi
 
 We first introduce RSRNs, then present experiments demonstrating performance on a set of benchmark tasks.
 We compare and contrast RSRNs to other models, and we discuss applications where RSRNs may be suitable.
+
+\section{Recursive Sequence Reduction Networks}
+
+One way we can understand a sequence classification task is as learning a transformation from a variable-dimension input (a sequence) to a fixed-dimension output (e.g. a vector of class probabilities).
+We consider a function $f(x,\theta)$ that operates on sequences with a fixed number of features ($M$) but arbitrary length.
+If $x \in \real^{M \times N}$, then $f(x, \theta) \in \real^{M \times N'}$, where $1 \leq N' \leq N/K$ for some $K \in \mathbb{Z}$, $K \geq 2$.
+That is, $f$ reduces a sequence of arbitrary length ($N$) to a sequence that is a fraction of the length.
+We can apply $f$ recursively to reduce a sequence to a fixed-dimension feature vector.
+
+\begin{equation}
+    F(x, \theta) =
+    \begin{cases}
+        x &\text{if } x \in \real^{M \times 1} \\
+        F(f(x, \theta), \theta) &\text{otherwise}
+    \end{cases}
+\end{equation}
+
+In our RSRNs, we model $f$ with a convolutional network; specifically, a variant of a resnet, using strided convolutions to reduce sequence length at each step.
+However, in typical usage of a resnet-style network, we would stack multiple layers to create a deep network.
+Here, we simply apply the \emph{same} resnet layers (i.e. sharing weights) repeatedly until the sequence is reduced.
 
 \end{document}
