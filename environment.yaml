@@ -5,6 +5,7 @@ dependencies:
   - conda-forge::torchmetrics=0.2
   - conda-forge::omegaconf=2.0.6
   - cudatoolkit=10.2
+  - matplotlib=3.3
   - numpy=1.19
   - pandas=1.2
   - pytorch::pytorch=1.8

@@ -1,6 +1,7 @@
 import argparse
 import csv
 import datetime
+import matplotlib.pyplot as plt
 import omegaconf as oc
 import os
 import torch
@@ -50,6 +51,8 @@ def _tboard_metrics(tb, mets, suffix, e):
     for k,v in mets.items():
         if isinstance(v, float):
             tb.add_scalar(k+suffix, v, e)
+        elif isinstance(v, plt.Figure):
+            tb.add_figure(k+suffix, v, e)
 
 def _csv_metrics(mets):
     return {k:v for k,v in mets.items() if isinstance(v,float)}
