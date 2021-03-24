@@ -46,6 +46,14 @@ def _tboard_hparams(tb, hparams, metrics):
     for s in tut.summary.hparams(hparams, metrics):
         tb.file_writer.add_summary(s)
 
+def _tboard_metrics(tb, mets, suffix, e):
+    for k,v in mets.items():
+        if isinstance(v, float):
+            tb.add_scalar(k+suffix, v, e)
+
+def _csv_metrics(mets):
+    return {k:v for k,v in mets.items() if isinstance(v,float)}
+
 def _batch_to_device(batch, device):
     if isinstance(batch, torch.Tensor):
         return batch.to(device)
@@ -60,7 +68,7 @@ def run(
         model_con,
         data_con,
         loss_con,
-        metrics = {},
+        metrics_con,
         gpu = True):
     output, hparams = _parse_args(default_out, default_conf)
     name = datetime.datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
@@ -73,14 +81,10 @@ def run(
     train_data, val_data = data_con(**hparams.get('data', {}))
     loss_fn = loss_con(**hparams.get('loss', {}))
     loss_fn.to(device)
-    train_metrics = tmet.MetricCollection(metrics)
-    val_metrics = train_metrics.clone()
+    train_metrics = metrics_con()
     train_metrics.to(device)
+    val_metrics = metrics_con()
     val_metrics.to(device)
-    for m in train_metrics.values():
-        m.to(device)
-    for m in val_metrics.values():
-        m.to(device)
     train_hparams = hparams['train']
     optimizer = optim.AdamW(
         params = model.parameters(),
@@ -88,9 +92,9 @@ def run(
         weight_decay = train_hparams['weight_decay'])
     csvpath = os.path.join(output, 'metrics.csv')
     with open(csvpath, 'w', newline='') as csvf, tut.SummaryWriter(output) as tb:
-        csvw = csv.DictWriter(csvf, ['epoch','stage','loss'] + list(train_metrics.keys()))
+        csvw = csv.DictWriter(csvf, ['epoch','stage','loss'] + train_metrics.scalars)
         csvw.writeheader()
-        _tboard_hparams(tb, hparams, ['loss'] + list(train_metrics.keys()))
+        _tboard_hparams(tb, hparams, ['loss'] + train_metrics.scalars)
         with tqdm.trange(train_hparams['epochs'], desc='Epoch') as et:
             for e in et:
                 model.train()
@@ -107,15 +111,14 @@ def run(
                         total_loss += loss.item()
                         total_len += N.shape[0]
                         bt.set_postfix(Loss=total_loss/total_len)
-                        train_metrics(torch.argmax(y_pred, dim=1), y)
+                        train_metrics(y_pred, y)
                 train_loss = total_loss / total_len
-                train_mets = {k:v.item() for k,v in train_metrics.compute().items()}
+                train_mets = train_metrics.compute()
                 train_metrics.reset()
-                csvw.writerow({'epoch':e, 'stage':'train', 'loss':train_loss, **train_mets})
+                csvw.writerow({'epoch':e, 'stage':'train', 'loss':train_loss, **_csv_metrics(train_mets)})
                 csvf.flush()
                 tb.add_scalar('loss/train', train_loss, e)
-                for k, v in train_mets.items():
-                    tb.add_scalar(k+'/train', v, e)
+                _tboard_metrics(tb, train_mets, '/train', e)
                 model.eval()
                 with torch.no_grad():
                     total_loss = 0.0
@@ -128,15 +131,14 @@ def run(
                             total_loss += loss.item()
                             total_len += N.shape[0]
                             bt.set_postfix(Loss=total_loss/total_len)
-                            val_metrics(torch.argmax(y_pred, dim=1), y)
+                            val_metrics(y_pred, y)
                 val_loss = total_loss / total_len
-                val_mets = {k:v.item() for k,v in val_metrics.compute().items()}
+                val_mets = val_metrics.compute()
                 val_metrics.reset()
-                csvw.writerow({'epoch':e, 'stage':'val', 'loss':val_loss, **val_mets})
+                csvw.writerow({'epoch':e, 'stage':'val', 'loss':val_loss, **_csv_metrics(val_mets)})
                 csvf.flush()
                 tb.add_scalar('loss/val', val_loss, e)
-                for k, v in val_mets.items():
-                    tb.add_scalar(k+'/val', v, e)
+                _tboard_metrics(tb, val_mets, '/val', e)
                 et.set_postfix(Train=train_loss, Val=val_loss)
                 torch.save(
                     {'epoch':e, 'model':model.state_dict(), 'optim':optimizer.state_dict()},
