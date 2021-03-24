@@ -101,8 +101,7 @@ class Cinc2017:
         x = tnur.pad_sequence(xs, batch_first=True).transpose(1,2)
         N = torch.tensor(Ns, dtype=torch.int)
         y = torch.tensor(ys, dtype=torch.long)
-        N, sorted_indices = torch.sort(N)
-        return x[sorted_indices], N, y[sorted_indices]
+        return x, N, y
 
     def _train_dataloader(self, train_ds, batch_size, balanced_sampling):
         if balanced_sampling:
