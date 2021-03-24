@@ -276,7 +276,9 @@ class Classify(nn.Module):
             in_features = outproj_size,
             out_features = classes)
 
-    def forward(self, x, N):
+    def forward(self, xs):
+        N = torch.tensor([x.shape[0] for x in xs], device=xs[0].device, dtype=torch.int)
+        x = tnur.pad_sequence(xs, batch_first=True).transpose(1,2)
         N, sorted_indices = torch.sort(N)
         x = x[sorted_indices]
         h, N = self.inproj_conv(x, N)

@@ -62,6 +62,8 @@ def _batch_to_device(batch, device):
         return batch.to(device)
     elif isinstance(batch, tuple):
         return tuple(_batch_to_device(b, device) for b in batch)
+    elif isinstance(batch, list):
+        return [_batch_to_device(b, device) for b in batch]
     else:
         raise ValueError()
 
@@ -105,14 +107,14 @@ def run(
                 total_len = 0
                 with tqdm.tqdm(train_data, desc='Train', leave=False) as bt:
                     for b, batch in enumerate(bt):
-                        x, N, y = _batch_to_device(batch, device)
+                        x, y = _batch_to_device(batch, device)
                         optimizer.zero_grad()
-                        y_pred = model(x, N)
+                        y_pred = model(x)
                         loss = loss_fn(y_pred, y)
                         loss.backward()
                         optimizer.step()
                         total_loss += loss.item()
-                        total_len += N.shape[0]
+                        total_len += y.shape[0]
                         bt.set_postfix(Loss=total_loss/total_len)
                         train_metrics(y_pred, y)
                 train_loss = total_loss / total_len
@@ -128,11 +130,11 @@ def run(
                     total_len = 0
                     with tqdm.tqdm(val_data, desc='Val', leave=False) as bt:
                         for b, batch in enumerate(bt):
-                            x, N, y = _batch_to_device(batch, device)
-                            y_pred = model(x, N)
+                            x, y = _batch_to_device(batch, device)
+                            y_pred = model(x)
                             loss = loss_fn(y_pred, y)
                             total_loss += loss.item()
-                            total_len += N.shape[0]
+                            total_len += y.shape[0]
                             bt.set_postfix(Loss=total_loss/total_len)
                             val_metrics(y_pred, y)
                 val_loss = total_loss / total_len

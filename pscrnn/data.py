@@ -29,7 +29,7 @@ class Cinc2017Dataset(tud.Dataset):
             trimmed = np.random.randint(int(length*self.trim_min), length)
             offset = np.random.randint(length-trimmed)
             x = x[offset:(offset+trimmed)]
-        return x, self.y[idx]
+        return torch.tensor(x), self.y[idx]
 
 class Cinc2017:
     CATS = ['N','A','O','~']
@@ -97,11 +97,9 @@ class Cinc2017:
 
     @staticmethod
     def _collate(batch):
-        xs, Ns, ys = zip(*((torch.tensor(x), x.shape[0], y) for x, y in batch))
-        x = tnur.pad_sequence(xs, batch_first=True).transpose(1,2)
-        N = torch.tensor(Ns, dtype=torch.int)
+        xs, ys = zip(*batch)
         y = torch.tensor(ys, dtype=torch.long)
-        return x, N, y
+        return xs, y
 
     def _train_dataloader(self, train_ds, batch_size, balanced_sampling):
         if balanced_sampling:
