@@ -237,17 +237,20 @@ class Expand(nn.Module):
 class Classify(nn.Module):
     def __init__(self,
             features, classes,
-            inproj_size=8, inproj_stride=4,
+            inproj_size=7, inproj_stride=4,
             hidden=64, kernel_size=5, stride=2, layers=2, depth_variant=True,
+            outproj_size=64,
             dropout=0.2, leak=0.0, weight_norm=True, layer_norm=True):
         super().__init__()
-        self.inproj_size = inproj_size
-        self.inproj_stride = inproj_stride
-        self.inproj = nn.Conv1d(
+        self.inproj_conv = SeqConv(
             in_channels = features,
             out_channels = hidden,
             kernel_size = inproj_size,
-            stride = inproj_stride)
+            stride = inproj_stride,
+            pad_delta = 1,
+            weight_norm = weight_norm)
+        self.inproj_norm = SeqLayerNorm() if layer_norm else None
+        self.inproj_act = nn.LeakyReLU(leak) if leak>0.0 else nn.ReLU()
         self.reduce = Reduce(
             hidden = hidden,
             kernel_size = kernel_size,
@@ -258,12 +261,20 @@ class Classify(nn.Module):
             leak = leak,
             weight_norm = weight_norm,
             layer_norm = layer_norm)
-        self.outproj = nn.Linear(
+        self.outproj_lin1 = nn.Linear(
             in_features = hidden,
+            out_features = outproj_size)
+        self.outproj_act = nn.LeakyReLU(leak) if leak>0.0 else nn.ReLU()
+        self.outproj_lin2 = nn.Linear(
+            in_features = outproj_size,
             out_features = classes)
 
     def forward(self, x, N):
-        h = self.inproj(x)
-        N = torch.floor(((N - self.inproj_size) / self.inproj_stride) + 1).long()
+        h, N = self.inproj_conv(x, N)
+        if self.inproj_norm is not None:
+            h = self.inproj_norm(h, N)
+        h = self.inproj_act(h)
         h = self.reduce(h, N)
-        return self.outproj(h)
+        h = self.outproj_lin1(h)
+        h = self.outproj_act(h)
+        return self.outproj_lin2(h)

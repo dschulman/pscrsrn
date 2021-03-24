@@ -4,13 +4,14 @@ data:
   trim_min: 0.5
   balanced_sampling: True
 model:
-  inproj_size: 8
+  inproj_size: 7
   inproj_stride: 4
   hidden: 64
   kernel_size: 5
   stride: 2
   layers: 2
   depth_variant: True
+  outproj_size: 64
   leak: 0.0
   dropout: 0.2
   weight_norm: True
