@@ -43,7 +43,8 @@ def main():
         model_con = lambda **hparams: pst.Classify(d.n_features, d.n_classes, **hparams),
         data_con = d,
         loss_con = nn.CrossEntropyLoss,
-        metrics_con = lambda: Metrics(d.CATS))
+        metrics_con = lambda: Metrics(d.CATS),
+        val_every_n_epochs = 5)
 
 if __name__ == '__main__':
     main()

@@ -74,7 +74,8 @@ def run(
         data_con,
         loss_con,
         metrics_con,
-        gpu = True):
+        gpu = True,
+        val_every_n_epochs = 1):
     output, hparams = _parse_args(default_out, default_conf)
     name = datetime.datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
     output = os.path.join(output, name)
@@ -124,29 +125,30 @@ def run(
                 csvf.flush()
                 tb.add_scalar('loss/train', train_loss, e)
                 _tboard_metrics(tb, train_mets, '/train', e)
-                model.eval()
-                with torch.no_grad():
-                    total_loss = 0.0
-                    total_len = 0
-                    with tqdm.tqdm(val_data, desc='Val', leave=False) as bt:
-                        for b, batch in enumerate(bt):
-                            x, y = _batch_to_device(batch, device)
-                            y_preds = model(x)
-                            y_preds = torch.stack(torch.chunk(y_preds, y.shape[0]))
-                            y_pred = torch.mean(y_preds, dim=1)
-                            loss = loss_fn(y_pred, y)
-                            total_loss += loss.item()
-                            total_len += y.shape[0]
-                            bt.set_postfix(Loss=total_loss/total_len)
-                            val_metrics(y_pred, y)
-                val_loss = total_loss / total_len
-                val_mets = val_metrics.compute()
-                val_metrics.reset()
-                csvw.writerow({'epoch':e, 'stage':'val', 'loss':val_loss, **_csv_metrics(val_mets)})
-                csvf.flush()
-                tb.add_scalar('loss/val', val_loss, e)
-                _tboard_metrics(tb, val_mets, '/val', e)
-                et.set_postfix(Train=train_loss, Val=val_loss)
+                if ((e+1) % val_every_n_epochs) == 0:
+                    model.eval()
+                    with torch.no_grad():
+                        total_loss = 0.0
+                        total_len = 0
+                        with tqdm.tqdm(val_data, desc='Val', leave=False) as bt:
+                            for b, batch in enumerate(bt):
+                                x, y = _batch_to_device(batch, device)
+                                y_preds = model(x)
+                                y_preds = torch.stack(torch.chunk(y_preds, y.shape[0]))
+                                y_pred = torch.mean(y_preds, dim=1)
+                                loss = loss_fn(y_pred, y)
+                                total_loss += loss.item()
+                                total_len += y.shape[0]
+                                bt.set_postfix(Loss=total_loss/total_len)
+                                val_metrics(y_pred, y)
+                    val_loss = total_loss / total_len
+                    val_mets = val_metrics.compute()
+                    val_metrics.reset()
+                    csvw.writerow({'epoch':e, 'stage':'val', 'loss':val_loss, **_csv_metrics(val_mets)})
+                    csvf.flush()
+                    tb.add_scalar('loss/val', val_loss, e)
+                    _tboard_metrics(tb, val_mets, '/val', e)
+                    et.set_postfix(Train=train_loss, Val=val_loss)
                 torch.save(
                     {'epoch':e, 'model':model.state_dict(), 'optim':optimizer.state_dict()},
                     os.path.join(output, 'checkpoint.pt'))
