@@ -23,7 +23,7 @@ class Cinc2017Dataset(tud.Dataset):
 
     def _augment(self, x):
         length = x.shape[0]
-        trimmed = torch.randint(int(length*self.trim_min), ()).item()
+        trimmed = torch.randint(int(length*self.trim_min), length, ()).item()
         offset = torch.randint(length-trimmed, ()).item()
         return x[offset:(offset+trimmed)]
 
