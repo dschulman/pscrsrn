@@ -3,6 +3,12 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 
+\usepackage{tikz}
+\usetikzlibrary{positioning}
+
+\tikzstyle{block} = [draw, rectangle, align=center]
+\tikzstyle{op} = [draw, inner sep=1pt, circle]
+
 \newcommand{\real}{\mathbb{R}}
 
 \title{Physiological Signal Classification with Recursive Sequence Reduction}
@@ -44,6 +50,35 @@ We can apply $f$ recursively to reduce a sequence to a fixed-dimension feature v
 
 In our RSRNs, we model $f$ with a convolutional network; specifically, a variant of a resnet, using strided convolutions to reduce sequence length at each step.
 However, in typical usage of a resnet-style network, we would stack multiple layers to create a deep network.
-Here, we simply apply the \emph{same} resnet layers (i.e. sharing weights) repeatedly until the sequence is reduced.
+Here, we simply apply the \emph{same} layers (i.e. sharing weights) repeatedly until the sequence is reduced.
+
+\begin{figure}
+\centering
+\begin{tikzpicture}[node distance=12pt]
+\node (input) [coordinate] {};
+\node (split) [fill, circle, inner sep=0pt, minimum size=4pt, above=of input] {};
+\draw [->] (input) -- (split);
+\node (conv1r) [block, above=of split] {Conv\\width=5\\stride=2};
+\draw [->] (split) -- (conv1r);
+\node (conv1l) [block, left=of conv1r] {Conv\\width=5\\stride=2};
+\draw [->] (split) -| (conv1l);
+\node (ln1) [block, above=of conv1r] {Layer Norm};
+\draw [->] (conv1r) -- (ln1);
+\node (relu1) [block, above=of ln1] {ReLU};
+\draw [->] (ln1) -- (relu1);
+\node (conv2) [block, above=of relu1] {Conv\\width=5\\stride=1};
+\draw [->] (relu1) -- (conv2);
+\node (ln2) [block, above=of conv2] {Layer Norm};
+\draw [->] (conv2) -- (ln2);
+\node (sum) [op, above=of ln2] {$+$};
+\draw [->] (conv1l) |- (sum);
+\draw [->] (ln2) -- (sum);
+\node (relu2) [block, above=of sum] {ReLU};
+\draw [->] (sum) -- (relu2);
+\node (output) [coordinate, above=of relu2] {};
+\draw [->] (relu2) -- (output);
+\end{tikzpicture}
+\caption{A Basic Block}
+\end{figure}
 
 \end{document}
