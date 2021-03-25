@@ -23,8 +23,8 @@ class Cinc2017Dataset(tud.Dataset):
 
     def _augment(self, x):
         length = x.shape[0]
-        trimmed = np.random.randint(int(length*self.trim_min), length)
-        offset = np.random.randint(length-trimmed)
+        trimmed = torch.randint(int(length*self.trim_min), ()).item()
+        offset = torch.randint(length-trimmed, ()).item()
         return x[offset:(offset+trimmed)]
 
 class Cinc2017TrainDataset(Cinc2017Dataset):
@@ -34,9 +34,9 @@ class Cinc2017TrainDataset(Cinc2017Dataset):
 
     def __getitem__(self, idx):
         x = self.xs[idx]
-        if self.trim_prob and (np.random.random() < self.trim_prob):
+        if self.trim_prob and (torch.rand(()).item() < self.trim_prob):
             x = self._augment(x)
-        return torch.tensor(x), self.y[idx]
+        return x, self.y[idx]
 
 class Cinc2017TestDataset(Cinc2017Dataset):
     def __init__(self, xs, y, weights, augments, trim_min=0.5):
@@ -47,7 +47,7 @@ class Cinc2017TestDataset(Cinc2017Dataset):
         xs = [self.xs[idx]]
         for _ in range(self.augments):
             xs.append(self._augment(xs[0]))
-        return [torch.tensor(x) for x in xs], self.y[idx]
+        return xs, self.y[idx]
 
 class Cinc2017:
     CATS = ['N','A','O','~']
@@ -87,7 +87,7 @@ class Cinc2017:
             x = spio.loadmat(path)['val'][0].astype(np.float32)
             x = np.expand_dims(x, -1)
             x = (x - x.mean()) / x.std()
-            xs.append(x)
+            xs.append(torch.tensor(x))
         xs = np.array(xs, dtype=np.object)
         y = pd.Categorical(ref['label'], self.CATS).codes
         counts = np.unique(y, return_counts=True)[1]
