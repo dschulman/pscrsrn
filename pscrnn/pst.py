@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.utils.rnn as tnur
+from typing import List
 
 def seq_mask(x, N):
     mask = torch.arange(x.shape[2], device=N.device) < N.unsqueeze(1)
@@ -10,7 +11,7 @@ def seq_mask(x, N):
 
 class _SeqConvBase(nn.Module):
     def __init__(self, conv_cls, 
-            in_channels, out_channels, kernel_size, stride, pad_delta, weight_norm):
+            in_channels, out_channels, kernel_size, stride, pad_delta):
         if (kernel_size % 2) == 0:
             raise ValueError('kernel_size should be odd')
         if stride > kernel_size:
@@ -27,19 +28,15 @@ class _SeqConvBase(nn.Module):
         self.kernel_size = kernel_size
         self.stride = stride
         self.pad_delta = pad_delta
-        self.weight_norm = weight_norm
         self.conv = conv_cls(
             in_channels, out_channels, kernel_size,
             stride = stride,
             padding = (kernel_size - pad_delta) // 2)
-        if weight_norm:
-            nn.utils.weight_norm(self.conv)
-    
+
 class SeqConv(_SeqConvBase):
     def __init__(self,
-            in_channels, out_channels, kernel_size, stride, pad_delta,
-            weight_norm = False):
-        super().__init__(nn.Conv1d, in_channels, out_channels, kernel_size, stride, pad_delta, weight_norm)
+            in_channels, out_channels, kernel_size, stride, pad_delta):
+        super().__init__(nn.Conv1d, in_channels, out_channels, kernel_size, stride, pad_delta)
 
     def forward(self, x, N):
         x = self.conv(x * seq_mask(x, N))
@@ -48,9 +45,8 @@ class SeqConv(_SeqConvBase):
 
 class SeqConvTranspose(_SeqConvBase):
     def __init__(self, 
-            in_channels, out_channels, kernel_size, stride, pad_delta,
-            weight_norm = False):
-        super().__init__(nn.ConvTranspose1d, in_channels, out_channels, kernel_size, stride, pad_delta, weight_norm)
+            in_channels, out_channels, kernel_size, stride, pad_delta):
+        super().__init__(nn.ConvTranspose1d, in_channels, out_channels, kernel_size, stride, pad_delta)
 
     def forward(self, x, N):
         x = self.conv(x * seq_mask(x, N))
@@ -77,14 +73,13 @@ class SeqLayerNorm(nn.Module):
 class Block(nn.Module):
     def __init__(self, seq_conv_cls,
             channels, kernel_size, stride, pad_delta,
-            leak=0.0, weight_norm=True, layer_norm=True, depth_variant=True):
+            leak=0.0, layer_norm=True, depth_variant=True):
         super().__init__()
         self.channels = channels
         self.kernel_size = kernel_size
         self.stride = stride
         self.pad_delta = pad_delta
         self.leak = leak
-        self.weight_norm = weight_norm
         self.layer_norm = layer_norm
         self.depth_variant = depth_variant
         self.conv1 = seq_conv_cls(
@@ -92,27 +87,25 @@ class Block(nn.Module):
             out_channels = channels * 2,
             kernel_size = kernel_size,
             stride = stride,
-            pad_delta = pad_delta,
-            weight_norm = weight_norm)
+            pad_delta = pad_delta)
         self.norm1 = SeqLayerNorm() if layer_norm else None
         self.conv2 = seq_conv_cls(
             in_channels = channels + (1 if depth_variant else 0),
             out_channels = channels,
             kernel_size = kernel_size,
             stride = 1,
-            pad_delta = 1,
-            weight_norm = weight_norm)
+            pad_delta = 1)
         self.norm2 = SeqLayerNorm() if layer_norm else None
         self.act = nn.LeakyReLU(leak) if leak > 0 else nn.ReLU()
 
-    def _depth_cat(self, h, depth):
+    def _depth_cat(self, h, depth: int):
         if self.depth_variant:
             dshape = (h.shape[0], 1, h.shape[2])
             d = torch.full(dshape, math.log1p(depth), device=h.device)
             h = torch.cat([h,d], dim=1)
         return h
 
-    def forward(self, h, N, depth):
+    def forward(self, h, N, depth: int):
         c = self.channels
         h = self._depth_cat(h, depth)
         lr, N = self.conv1(h, N)
@@ -130,7 +123,7 @@ class Block(nn.Module):
 class Reduce(nn.Module):
     def __init__(self, 
             hidden, kernel_size, stride, layers, depth_variant, 
-            leak, dropout, weight_norm, layer_norm):
+            leak, dropout, layer_norm):
         super().__init__()
         self.hidden = hidden
         self.kernel_size = kernel_size
@@ -139,7 +132,6 @@ class Reduce(nn.Module):
         self.depth_variant = depth_variant
         self.leak = leak
         self.dropout = dropout
-        self.weight_norm = weight_norm
         self.layer_norm = layer_norm
         self.blocks = nn.ModuleList([
             Block(
@@ -149,17 +141,17 @@ class Reduce(nn.Module):
                 stride = stride, 
                 pad_delta = 1,
                 leak = leak,
-                depth_variant = depth_variant, 
-                weight_norm = weight_norm,
+                depth_variant = depth_variant,
                 layer_norm = layer_norm)
             for _ in range(layers)])
 
     def forward(self, h, N):
-        mask = None
         if self.training and self.dropout > 0.0:
             mask_shape = (h.shape[0], h.shape[1], 1)
             mask = torch.rand(mask_shape, device=h.device) > self.dropout
             mask = mask / (1 - self.dropout)
+        else:
+            mask = None
         out = []
         depth = 0
         while h.shape[0] > 0:
@@ -179,7 +171,7 @@ class Reduce(nn.Module):
 class Expand(nn.Module):
     def __init__(self, 
             hidden, kernel_size, stride, layers, depth_variant, 
-            leak, dropout, weight_norm, layer_norm):
+            leak, dropout, layer_norm):
         super().__init__()
         self.hidden = hidden
         self.kernel_size = kernel_size
@@ -188,7 +180,6 @@ class Expand(nn.Module):
         self.depth_variant = depth_variant
         self.leak = leak
         self.dropout = dropout
-        self.weight_norm = weight_norm
         self.layer_norm = layer_norm
         self.blocks = nn.ModuleList([
             Block(
@@ -198,8 +189,7 @@ class Expand(nn.Module):
                 stride = stride,
                 pad_delta = 3, 
                 leak = leak,
-                depth_variant = depth_variant, 
-                weight_norm = weight_norm,
+                depth_variant = depth_variant,
                 layer_norm = layer_norm)
             for _ in range(layers)])
 
@@ -247,15 +237,14 @@ class Classify(nn.Module):
             inproj_size=7, inproj_stride=4,
             hidden=64, kernel_size=5, stride=2, layers=2, depth_variant=True,
             outproj_size=64,
-            dropout=0.2, leak=0.0, weight_norm=True, layer_norm=True):
+            dropout=0.2, leak=0.0, layer_norm=True):
         super().__init__()
         self.inproj_conv = SeqConv(
             in_channels = features,
             out_channels = hidden,
             kernel_size = inproj_size,
             stride = inproj_stride,
-            pad_delta = 1,
-            weight_norm = weight_norm)
+            pad_delta = 1)
         self.inproj_norm = SeqLayerNorm() if layer_norm else None
         self.inproj_act = nn.LeakyReLU(leak) if leak>0.0 else nn.ReLU()
         self.reduce = Reduce(
@@ -266,7 +255,6 @@ class Classify(nn.Module):
             depth_variant = depth_variant,
             dropout = dropout,
             leak = leak,
-            weight_norm = weight_norm,
             layer_norm = layer_norm)
         self.outproj_lin1 = nn.Linear(
             in_features = hidden,
@@ -276,7 +264,7 @@ class Classify(nn.Module):
             in_features = outproj_size,
             out_features = classes)
 
-    def forward(self, xs):
+    def forward(self, xs: List[torch.Tensor]):
         N = torch.tensor([x.shape[0] for x in xs], device=xs[0].device, dtype=torch.int)
         x = tnur.pad_sequence(xs, batch_first=True).transpose(1,2)
         N, sorted_indices = torch.sort(N)
