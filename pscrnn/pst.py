@@ -61,11 +61,11 @@ class SeqLayerNorm(nn.Module):
         self.bias = nn.Parameter(torch.zeros(()))
 
     def forward(self, x, N):
-        x = x * seq_mask(x, N)
+        mask = seq_mask(x, N)
         N = N.unsqueeze(-1).unsqueeze(-1)
-        mu = torch.sum(x, dim=[1,2], keepdim=True) / x.shape[1] / N
+        mu = torch.sum(x * mask, dim=[1,2], keepdim=True) / x.shape[1] / N
         z = x - mu
-        var = torch.sum(z*z, dim=[1,2], keepdim=True) / x.shape[1] / N
+        var = torch.sum(z*z * mask, dim=[1,2], keepdim=True) / x.shape[1] / N
         w = torch.exp(self.log_weight)
         b = self.bias
         return w * z * torch.rsqrt(var + self.eps) + b 
