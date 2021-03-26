@@ -37,10 +37,16 @@ class Metrics(nn.Module):
 
 def main():
     d = data.Cinc2017()
+    def model(**hparams):
+        mtype = hparams['type']
+        hparams = hparams.copy()
+        del hparams['type']
+        if mtype == 'rsrn':
+            return pst.Classify(d.n_features, d.n_classes, **hparams)
+        raise ValueError('unknown model type: ' + mtype)
     train.run(
         default_out = 'outputs',
-        default_conf = 'default.yaml',
-        model_con = lambda **hparams: pst.Classify(d.n_features, d.n_classes, **hparams),
+        model_con = model,
         data_con = d,
         loss_con = nn.CrossEntropyLoss,
         metrics_con = lambda: Metrics(d.CATS),

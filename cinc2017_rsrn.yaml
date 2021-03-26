@@ -5,6 +5,7 @@ data:
   trim_min: 0.5
   balanced_sampling: True
 model:
+  type: rsrn
   inproj_size: 7
   inproj_stride: 4
   hidden: 64
