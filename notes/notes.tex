@@ -4,14 +4,14 @@
 \usepackage{amssymb}
 
 \usepackage{tikz}
-\usetikzlibrary{positioning}
+\usetikzlibrary{fit,positioning}
 
 \tikzstyle{block} = [draw, rectangle, align=center]
 \tikzstyle{op} = [draw, inner sep=1pt, circle]
 
 \newcommand{\real}{\mathbb{R}}
 
-\title{Physiological Signal Classification with Recursive Sequence Reduction}
+\title{Physiological Signal Classification with Recursive Sequence Reduction Networks}
 \author{Daniel Schulman}
 
 \begin{document}
@@ -79,6 +79,65 @@ Here, we simply apply the \emph{same} layers (i.e. sharing weights) repeatedly u
 \draw [->] (relu2) -- (output);
 \end{tikzpicture}
 \caption{A Basic Block}
+\label{fig:block}
 \end{figure}
+
+Our RSRN is a sequence of one or more basic blocks, where the number of blocks is a hyperparameter.
+A basic block (Figure~\ref{fig:block}) is a series of two convolutions, with layer normalization and rectified linear activation, summed with a residual connection, which has its own convolution.
+All convolutions use the same number of channels; we call this the ``hidden state size'', as in RNNs.
+The first convolution is strided, reducing sequence length.
+This differs in a few details from a block in a typical resnet.
+First, we use layer normalization rather than batch normalization, as layer normalization is appropriate for a recursively-applied model.
+Second, a typical resnet uses a width-one convolution on the residual connection; we must use a strided convolution here (to keep the sequence length the same through both paths), and a width-one strided convolution would discard some inputs.
+
+\begin{figure}
+\centering
+\begin{tikzpicture}[node distance=12pt]
+\node (input) [coordinate] {};
+\node (inconv) [block, above=of input] {Conv\\width=7\\stride=4};
+\draw [->] (input) -- (inconv);
+\node (inln) [block, above=of inconv] {Layer Norm};
+\draw [->] (inconv) -- (inln);
+\node (inrelu) [block, above=of inln] {ReLU};
+\draw [->] (inln) -- (inrelu);
+\node (rin) [coordinate, above=of inrelu] {};
+\draw (inrelu) -- (rin);
+\node (block1) [block, above=of rin] {Block};
+\draw [->] (rin) -- (block1);
+\node (block2) [block, above=of block1] {Block};
+\draw [->] (block1) -- (block2);
+\node (rout) [coordinate, above=of block2] {};
+\draw (block2) -- (rout);
+\node (recur1) [coordinate, right=3em of rout] {};
+\draw (rout) -- (recur1);
+\node (recur2) [coordinate, right=3em of rin] {};
+\draw (recur1) -- (recur2);
+\draw [->] (recur2) -- (rin);
+\node (dummy) [coordinate, left=2em of rout] {};
+\node [
+    draw, dashed, rectangle,
+    fit=(rin) (rout) (block1) (block2) (recur1) (recur2) (dummy),
+    label=left:RSRN
+] {};
+\node (outlin1) [block, above=of rout] {Linear};
+\draw [->] (rout) -- (outlin1);
+\node (outrelu) [block, above=of outlin1] {ReLU};
+\draw [->] (outlin1) -- (outrelu);
+\node (outlin2) [block, above=of outrelu] {Linear};
+\draw [->] (outrelu) -- (outlin2);
+\node (output) [coordinate, above=of outlin2] {};
+\draw [->] (outlin2) -- (output);
+\end{tikzpicture}
+\caption{A RSRN Model for Sequence Classification}
+\label{fig:model}
+\end{figure}
+
+Figure~\ref{fig:model} shows a simple and generic physiological sequence classification model using an RSRN.
+First, input is passed through a convolutional layer which upsamples along the feature dimension (as the hidden state size of the RSRN will typically be much higher than the input feature dimension).
+Our experiments show that a fairly wide strided convolution works well here.
+We conjecture that it is useful to have some downsampling along the temporal dimension, where physiological signals are typically high resolution.
+
+An RSRN is then used to reduce from an arbitrary-length sequence to a single hidden state.
+Finally, a shallow fully-connected network produces outputs.
 
 \end{document}
