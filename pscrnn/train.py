@@ -28,6 +28,9 @@ def _parse_args(default_out, default_conf):
         oc.OmegaConf.from_cli(args.override))
     return args.out, hparams
 
+def _nparams(model):
+    return sum(torch.numel(p) for p in model.parameters() if p.requires_grad)
+
 def _prefixed(s, prefix):
     return s if prefix is None else prefix+'/'+s
 
@@ -80,9 +83,10 @@ def run(
     name = datetime.datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
     output = os.path.join(output, name)
     os.makedirs(output, exist_ok = True)
-    oc.OmegaConf.save(hparams, os.path.join(output, 'hparams.yaml'))
     device = torch.device('cuda' if gpu and torch.cuda.is_available() else 'cpu')
     model = model_con(**hparams.get('model', {}))
+    hparams['nparams'] = _nparams(model)
+    oc.OmegaConf.save(hparams, os.path.join(output, 'hparams.yaml'))
     model.to(device)
     train_data, val_data = data_con(**hparams.get('data', {}))
     loss_fn = loss_con(**hparams.get('loss', {}))
