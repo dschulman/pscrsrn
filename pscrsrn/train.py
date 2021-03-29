@@ -9,7 +9,7 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as lrs
 import torch.utils.tensorboard as tut
 import torchmetrics as tmet
-import tqdm
+from tqdm.auto import tqdm, trange
 
 def _parse_args(hparams, default_out):
     if hparams is not None:
@@ -108,12 +108,12 @@ def run(
         csvw = csv.DictWriter(csvf, ['epoch','stage','loss'] + train_metrics.scalars)
         csvw.writeheader()
         _tboard_hparams(tb, hparams, ['loss'] + train_metrics.scalars)
-        with tqdm.trange(train_hparams['epochs'], desc='Epoch') as et:
+        with trange(train_hparams['epochs'], desc='Epoch') as et:
             for e in et:
                 model.train()
                 total_loss = 0.0
                 total_len = 0
-                with tqdm.tqdm(train_data, desc='Train', leave=False) as bt:
+                with tqdm(train_data, desc='Train', leave=False) as bt:
                     for b, batch in enumerate(bt):
                         x, y = _batch_to_device(batch, device)
                         optimizer.zero_grad()
@@ -137,7 +137,7 @@ def run(
                     with torch.no_grad():
                         total_loss = 0.0
                         total_len = 0
-                        with tqdm.tqdm(val_data, desc='Val', leave=False) as bt:
+                        with tqdm(val_data, desc='Val', leave=False) as bt:
                             for b, batch in enumerate(bt):
                                 x, y = _batch_to_device(batch, device)
                                 y_preds = model(x)
