@@ -79,7 +79,7 @@ class BatchNorm(nn.Module):
 
     def forward(self, x, N):
         m = mask(x, N)
-        denom = x.shape[0] * x.shape[2]
+        denom = N.sum()
         mu = torch.sum(x * m, dim=[0,2], keepdim=True) / denom
         z = x - mu
         var = torch.sum(z*z * m, dim=[0,2], keepdim=True) / denom
