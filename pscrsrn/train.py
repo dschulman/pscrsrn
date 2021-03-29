@@ -11,22 +11,25 @@ import torch.utils.tensorboard as tut
 import torchmetrics as tmet
 import tqdm
 
-def _parse_args(default_out):
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '-o', '--out', default=default_out,
-        help='Output directory')
-    parser.add_argument(
-        'base',
-        help='Base hyperparameter file')
-    parser.add_argument(
-        'override', nargs='*', 
-        help='Hyperparameter overrides')
-    args = parser.parse_args()
-    hparams = oc.OmegaConf.merge(
-        oc.OmegaConf.load(args.base),
-        oc.OmegaConf.from_cli(args.override))
-    return args.out, hparams
+def _parse_args(hparams, default_out):
+    if hparams is not None:
+        return default_out, oc.OmegaConf.create(hparams)
+    else:
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            '-o', '--out', default=default_out,
+            help='Output directory')
+        parser.add_argument(
+            'base',
+            help='Base hyperparameter file')
+        parser.add_argument(
+            'override', nargs='*', 
+            help='Hyperparameter overrides')
+        args = parser.parse_args()
+        hparams = oc.OmegaConf.merge(
+            oc.OmegaConf.load(args.base),
+            oc.OmegaConf.from_cli(args.override))
+        return args.out, hparams
 
 def _nparams(model):
     return sum(torch.numel(p) for p in model.parameters() if p.requires_grad)
@@ -71,6 +74,7 @@ def _batch_to_device(batch, device):
         raise ValueError()
 
 def run(
+        hparams,
         default_out,
         model_con,
         data_con,
@@ -78,7 +82,7 @@ def run(
         metrics_con,
         gpu = True,
         val_every_n_epochs = 1):
-    output, hparams = _parse_args(default_out)
+    output, hparams = _parse_args(hparams, default_out)
     name = datetime.datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
     output = os.path.join(output, name)
     os.makedirs(output, exist_ok = True)

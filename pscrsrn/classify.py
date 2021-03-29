@@ -35,7 +35,7 @@ class Metrics(nn.Module):
             'cm': cm.plot(self.cm.compute().cpu().numpy(), self.classes)
         }
 
-def main():
+def run(hparams=None):
     d = data.Cinc2017()
     def model(**hparams):
         mtype = hparams['type']
@@ -47,6 +47,7 @@ def main():
             return rnn.Classify(d.n_features, d.n_classes, **hparams)
         raise ValueError('unknown model type: ' + mtype)
     train.run(
+        hparams = hparams,
         default_out = 'outputs',
         model_con = model,
         data_con = d,
@@ -55,4 +56,4 @@ def main():
         val_every_n_epochs = 5)
 
 if __name__ == '__main__':
-    main()
+    run()
