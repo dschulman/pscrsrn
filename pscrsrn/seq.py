@@ -71,8 +71,8 @@ class BatchNorm(nn.Module):
         self.num_features = num_features
         self.eps = eps
         self.momentum = momentum
-        self.log_weight = nn.Parameter(torch.zeros(num_features))
-        self.bias = nn.Parameter(torch.zeros(num_features))
+        self.log_weight = nn.Parameter(torch.zeros(1, num_features, 1))
+        self.bias = nn.Parameter(torch.zeros(1, num_features, 1))
         self.register_buffer('running_mean', torch.zeros(1, num_features, 1))
         self.register_buffer('running_var', torch.ones(1, num_features, 1))
         self.register_buffer('num_batches_tracked', torch.tensor(0, dtype=torch.long))

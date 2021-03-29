@@ -57,7 +57,7 @@ class Classify(nn.Module):
         if self.inproj_norm is not None:
             h = self.inproj_norm(h, N)
         h = self.inproj_act(h)
-        h = tnur.pack_padded_sequence(h.transpose(1,2), N, batch_first=True, enforce_sorted=False)
+        h = tnur.pack_padded_sequence(h.transpose(1,2), N.cpu(), batch_first=True, enforce_sorted=False)
         h, _ = self.rnn(h)
         h, _ = tnur.pad_packed_sequence(h, batch_first=True)
         hmean = torch.sum(h, dim=1) / N.unsqueeze(1)
