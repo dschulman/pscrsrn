@@ -4,71 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.utils.rnn as tnur
 from typing import List
-
-def seq_mask(x, N):
-    mask = torch.arange(x.shape[2], device=N.device) < N.unsqueeze(1)
-    return mask.unsqueeze(1)
-
-class _SeqConvBase(nn.Module):
-    def __init__(self, conv_cls, 
-            in_channels, out_channels, kernel_size, stride, pad_delta):
-        if (kernel_size % 2) == 0:
-            raise ValueError('kernel_size should be odd')
-        if stride > kernel_size:
-            raise ValueError('stride should be <= kernel_size')
-        if pad_delta < 1:
-            raise ValueError('pad_delta should be >= 1')
-        if (pad_delta % 2) == 0:
-            raise ValueError('pad_delta should be odd')
-        if pad_delta > kernel_size:
-            raise ValueError('pad_delta should be <= kernel_size')
-        super().__init__()
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.kernel_size = kernel_size
-        self.stride = stride
-        self.pad_delta = pad_delta
-        self.conv = conv_cls(
-            in_channels, out_channels, kernel_size,
-            stride = stride,
-            padding = (kernel_size - pad_delta) // 2)
-
-class SeqConv(_SeqConvBase):
-    def __init__(self,
-            in_channels, out_channels, kernel_size, stride, pad_delta):
-        super().__init__(nn.Conv1d, in_channels, out_channels, kernel_size, stride, pad_delta)
-
-    def forward(self, x, N):
-        x = self.conv(x * seq_mask(x, N))
-        N = torch.floor((N - self.pad_delta) / self.stride).long() + 1
-        return x, N
-
-class SeqConvTranspose(_SeqConvBase):
-    def __init__(self, 
-            in_channels, out_channels, kernel_size, stride, pad_delta):
-        super().__init__(nn.ConvTranspose1d, in_channels, out_channels, kernel_size, stride, pad_delta)
-
-    def forward(self, x, N):
-        x = self.conv(x * seq_mask(x, N))
-        N = ((N-1) * self.stride) + self.pad_delta
-        return x, N
-
-class SeqLayerNorm(nn.Module):
-    def __init__(self, eps=1e-5):
-        super().__init__()
-        self.eps = eps
-        self.log_weight = nn.Parameter(torch.zeros(()))
-        self.bias = nn.Parameter(torch.zeros(()))
-
-    def forward(self, x, N):
-        mask = seq_mask(x, N)
-        N = N.unsqueeze(-1).unsqueeze(-1)
-        mu = torch.sum(x * mask, dim=[1,2], keepdim=True) / x.shape[1] / N
-        z = x - mu
-        var = torch.sum(z*z * mask, dim=[1,2], keepdim=True) / x.shape[1] / N
-        w = torch.exp(self.log_weight)
-        b = self.bias
-        return w * z * torch.rsqrt(var + self.eps) + b 
+from . import seq
 
 class Block(nn.Module):
     def __init__(self, seq_conv_cls,
@@ -88,14 +24,14 @@ class Block(nn.Module):
             kernel_size = kernel_size,
             stride = stride,
             pad_delta = pad_delta)
-        self.norm1 = SeqLayerNorm() if layer_norm else None
+        self.norm1 = seq.LayerNorm() if layer_norm else None
         self.conv2 = seq_conv_cls(
             in_channels = channels + (1 if depth_variant else 0),
             out_channels = channels,
             kernel_size = kernel_size,
             stride = 1,
             pad_delta = 1)
-        self.norm2 = SeqLayerNorm() if layer_norm else None
+        self.norm2 = seq.LayerNorm() if layer_norm else None
         self.act = nn.LeakyReLU(leak) if leak > 0 else nn.ReLU()
 
     def _depth_cat(self, h, depth: int):
@@ -135,7 +71,7 @@ class Reduce(nn.Module):
         self.layer_norm = layer_norm
         self.blocks = nn.ModuleList([
             Block(
-                seq_conv_cls = SeqConv, 
+                seq_conv_cls = seq.Conv, 
                 channels = hidden, 
                 kernel_size = kernel_size, 
                 stride = stride, 
@@ -183,7 +119,7 @@ class Expand(nn.Module):
         self.layer_norm = layer_norm
         self.blocks = nn.ModuleList([
             Block(
-                seq_conv_cls = SeqConvTranspose, 
+                seq_conv_cls = seq.ConvTranspose, 
                 channels = hidden, 
                 kernel_size = kernel_size, 
                 stride = stride,
@@ -234,18 +170,18 @@ def invert_permutation(permutation):
 class Classify(nn.Module):
     def __init__(self,
             features, classes,
-            inproj_size=7, inproj_stride=4,
+            inproj_size=7, inproj_stride=4, inproj_norm=True,
             hidden=64, kernel_size=5, stride=2, layers=2, depth_variant=True,
             outproj_size=64,
             dropout=0.2, leak=0.0, layer_norm=True):
         super().__init__()
-        self.inproj_conv = SeqConv(
+        self.inproj_conv = seq.Conv(
             in_channels = features,
             out_channels = hidden,
             kernel_size = inproj_size,
             stride = inproj_stride,
             pad_delta = 1)
-        self.inproj_norm = SeqLayerNorm() if layer_norm else None
+        self.inproj_norm = seq.BatchNorm(hidden) if inproj_norm else None
         self.inproj_act = nn.LeakyReLU(leak) if leak>0.0 else nn.ReLU()
         self.reduce = Reduce(
             hidden = hidden,

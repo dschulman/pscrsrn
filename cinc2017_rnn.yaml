@@ -7,11 +7,15 @@ data:
 model:
   type: rnn
   cell_type: lstm
+  inproj_features: 64
+  inproj_size: 7
+  inproj_stride: 4
+  inproj_norm: True
   hidden: 64
   layers: 2
   bidirectional: True
   outproj_size: 64
-  outproj_leak: 0.0
+  leak: 0.0
   dropout: 0.2
 train:
   epochs: 200

@@ -8,6 +8,7 @@ model:
   type: rsrn
   inproj_size: 7
   inproj_stride: 4
+  inproj_norm: True
   hidden: 64
   kernel_size: 5
   stride: 2
