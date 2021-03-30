@@ -8,7 +8,7 @@ import shutil
 import torch
 import torch.nn.utils.rnn as tnur
 import torch.utils.data as tud
-import tqdm
+from tqdm.auto import tqdm
 import zipfile
 
 class Cinc2017Dataset(tud.Dataset):
@@ -71,7 +71,7 @@ class Cinc2017:
                     chunk_size = 1024
                     total = int(r.headers.get('content-length', 0)) // chunk_size
                     with open(zip_path, 'wb') as f:
-                        for chunk in tqdm.tqdm(r.iter_content(chunk_size), desc='Downloading Data', total=total):
+                        for chunk in tqdm(r.iter_content(chunk_size), desc='Downloading Data', total=total):
                             f.write(chunk)
             with zipfile.ZipFile(zip_path) as zf:
                 zf.extractall(tmp_path)
@@ -82,7 +82,7 @@ class Cinc2017:
         ref_path = os.path.join(self.path, 'REFERENCE.csv')
         ref = pd.read_csv(ref_path, names=['id','label'])
         xs = []
-        for mat_id in tqdm.tqdm(ref['id'], desc='Loading Data'):
+        for mat_id in tqdm(ref['id'], desc='Loading Data'):
             path = os.path.join(self.path, f'{mat_id}.mat')
             x = spio.loadmat(path)['val'][0].astype(np.float32)
             x = np.expand_dims(x, -1)
