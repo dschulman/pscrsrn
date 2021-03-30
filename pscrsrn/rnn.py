@@ -6,7 +6,7 @@ from . import seq
 class Classify(nn.Module):
     def __init__(self,
             features, classes,
-            inproj_features=64, inproj_size=7, inproj_stride=4, inproj_norm=True,
+            inproj_features=4, inproj_size=7, inproj_stride=4, inproj_norm=True,
             cell_type='lstm', hidden=64, layers=2, bidirectional=True,
             outproj_size=64,
             leak=0.0, dropout=0.2):

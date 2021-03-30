@@ -7,7 +7,7 @@ data:
 model:
   type: rnn
   cell_type: lstm
-  inproj_features: 64
+  inproj_features: 4
   inproj_size: 7
   inproj_stride: 4
   inproj_norm: True
