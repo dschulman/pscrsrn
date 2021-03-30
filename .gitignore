@@ -8,4 +8,6 @@ __pycache__
 /notes/*.fls
 /notes/*.log
 /notes/*.pdf
+!/notes/fig*.pdf
 /notes/*.synctex.gz
+/notes/.ipynb_checkpoints
