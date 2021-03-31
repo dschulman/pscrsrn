@@ -160,13 +160,6 @@ class Expand(nn.Module):
         hs = [hi.T[oi:(oi+Ni)] for hi, oi, Ni in zip(out_h, offset, N_orig)]
         return tnur.pad_sequence(hs, batch_first=True).transpose(1,2)
 
-def invert_permutation(permutation):
-    output = torch.empty_like(permutation)
-    output.scatter_(
-        0, permutation,
-        torch.arange(0, permutation.numel(), device=permutation.device))
-    return output
-
 class Classify(nn.Module):
     def __init__(self,
             features, classes,
@@ -213,4 +206,4 @@ class Classify(nn.Module):
         h = self.outproj_lin1(h)
         h = self.outproj_act(h)
         z = self.outproj_lin2(h)
-        return z[invert_permutation(sorted_indices)]
+        return z[seq.invert_permutation(sorted_indices)]

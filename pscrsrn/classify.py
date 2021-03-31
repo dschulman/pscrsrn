@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torchmetrics as tmet
-from . import cm, data, rnn, rsrn, train
+from . import cm, data, resnet, rnn, rsrn, train
 
 class Metrics(nn.Module):
     def __init__(self, classes):
@@ -45,6 +45,8 @@ def run(hparams=None):
             return rsrn.Classify(d.n_features, d.n_classes, **hparams)
         elif mtype == 'rnn':
             return rnn.Classify(d.n_features, d.n_classes, **hparams)
+        elif mtype == 'resnet':
+            return resnet.Classify(d.n_features, d.n_classes, **hparams)
         raise ValueError('unknown model type: ' + mtype)
     train.run(
         hparams = hparams,

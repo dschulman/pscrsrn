@@ -6,7 +6,8 @@ def mask(x, N):
 
 class _ConvBase(nn.Module):
     def __init__(self, conv_cls, 
-            in_channels, out_channels, kernel_size, stride, pad_delta):
+            in_channels, out_channels, kernel_size, stride, pad_delta,
+            bias = True):
         if (kernel_size % 2) == 0:
             raise ValueError('kernel_size should be odd')
         if stride > kernel_size:
@@ -26,12 +27,14 @@ class _ConvBase(nn.Module):
         self.conv = conv_cls(
             in_channels, out_channels, kernel_size,
             stride = stride,
-            padding = (kernel_size - pad_delta) // 2)
+            padding = (kernel_size - pad_delta) // 2,
+            bias = bias)
 
 class Conv(_ConvBase):
     def __init__(self,
-            in_channels, out_channels, kernel_size, stride, pad_delta):
-        super().__init__(nn.Conv1d, in_channels, out_channels, kernel_size, stride, pad_delta)
+            in_channels, out_channels, kernel_size, stride, pad_delta,
+            bias = True):
+        super().__init__(nn.Conv1d, in_channels, out_channels, kernel_size, stride, pad_delta, bias)
 
     def forward(self, x, N):
         x = self.conv(x * mask(x, N))
@@ -40,8 +43,9 @@ class Conv(_ConvBase):
 
 class ConvTranspose(_ConvBase):
     def __init__(self, 
-            in_channels, out_channels, kernel_size, stride, pad_delta):
-        super().__init__(nn.ConvTranspose1d, in_channels, out_channels, kernel_size, stride, pad_delta)
+            in_channels, out_channels, kernel_size, stride, pad_delta,
+            bias = True):
+        super().__init__(nn.ConvTranspose1d, in_channels, out_channels, kernel_size, stride, pad_delta, bias)
 
     def forward(self, x, N):
         x = self.conv(x * mask(x, N))
@@ -96,3 +100,11 @@ class BatchNorm(nn.Module):
         else:
             y = (x - self.running_mean) * torch.rsqrt(self.running_var + self.eps)
         return y * torch.exp(self.log_weight) + self.bias
+
+# TODO probably doesn't belong here
+def invert_permutation(permutation):
+    output = torch.empty_like(permutation)
+    output.scatter_(
+        0, permutation,
+        torch.arange(0, permutation.numel(), device=permutation.device))
+    return output
