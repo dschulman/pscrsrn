@@ -49,7 +49,7 @@ class Classify(nn.Module):
     def __init__(self,
             features, classes,
             inproj_size=7, inproj_stride=4, inproj_norm=True,
-            hidden=64, kernel_size=5, stride=2, layers=2, depth_variant=True,
+            hidden=64, kernel_size=5, stride=2, layers=2,
             outproj_size=64,
             dropout=0.2, leak=0.0, batch_norm=True):
         super().__init__()
