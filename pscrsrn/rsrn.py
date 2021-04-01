@@ -173,7 +173,8 @@ class Classify(nn.Module):
             out_channels = hidden,
             kernel_size = inproj_size,
             stride = inproj_stride,
-            pad_delta = 1)
+            pad_delta = 1,
+            bias = not inproj_norm)
         self.inproj_norm = seq.BatchNorm(hidden) if inproj_norm else None
         self.inproj_act = nn.LeakyReLU(leak) if leak>0.0 else nn.ReLU()
         self.reduce = Reduce(
