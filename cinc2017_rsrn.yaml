@@ -13,11 +13,12 @@ model:
   stride: 2
   layers: 2
   depth_variant: True
+  preact: True
   outproj_size: 64
   leak: 0.0
   dropout: 0.2
   layer_norm: True
 train:
-  epochs: 200
+  epochs: 100
   lr: 0.001
   weight_decay: 0.01

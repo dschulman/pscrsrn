@@ -6,7 +6,12 @@ import torch.nn.utils.rnn as tnur
 from typing import List
 from . import seq
 
-class Block(nn.Module):
+def _depth_cat(h, depth: int):
+    dshape = (h.shape[0], 1, h.shape[2])
+    d = torch.full(dshape, math.log1p(depth), device=h.device)
+    return torch.cat([h,d], dim=1)
+
+class BasicBlock(nn.Module):
     def __init__(self, seq_conv_cls,
             channels, kernel_size, stride, pad_delta,
             leak=0.0, layer_norm=True, depth_variant=True):
@@ -34,43 +39,94 @@ class Block(nn.Module):
         self.norm2 = seq.LayerNorm() if layer_norm else None
         self.act = nn.LeakyReLU(leak) if leak > 0 else nn.ReLU()
 
-    def _depth_cat(self, h, depth: int):
-        if self.depth_variant:
-            dshape = (h.shape[0], 1, h.shape[2])
-            d = torch.full(dshape, math.log1p(depth), device=h.device)
-            h = torch.cat([h,d], dim=1)
-        return h
-
     def forward(self, h, N, depth: int):
         c = self.channels
-        h = self._depth_cat(h, depth)
+        if self.depth_variant:
+            h = _depth_cat(h, depth)
         lr, N = self.conv1(h, N)
         l = lr[:,:c]
         r = lr[:,c:]
         if self.norm1 is not None:
             r = self.norm1(r, N)
         r = self.act(r)
-        r = self._depth_cat(r, depth)
+        if self.depth_variant:
+            r = _depth_cat(r, depth)
         r, _ = self.conv2(r, N)
         if self.norm2 is not None:
             r = self.norm2(r, N)
         return self.act(l + r), N
 
+class PreactBlock(nn.Module):
+    def __init__(self, seq_conv_cls,
+            channels, kernel_size, stride, pad_delta,
+            leak=0.0, layer_norm=True, depth_variant=True):
+        super().__init__()
+        self.channels = channels
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.pad_delta = pad_delta
+        self.leak = leak
+        self.layer_norm = layer_norm
+        self.depth_variant = depth_variant
+        self.norm1r = seq.LayerNorm() if layer_norm else None
+        self.conv1l = seq_conv_cls(
+            in_channels =  channels + (1 if depth_variant else 0),
+            out_channels = channels,
+            kernel_size = kernel_size,
+            stride = stride,
+            pad_delta = pad_delta)
+        self.conv1r = seq_conv_cls(
+            in_channels =  channels + (1 if depth_variant else 0),
+            out_channels = channels,
+            kernel_size = kernel_size,
+            stride = stride,
+            pad_delta = pad_delta)
+        self.norm2 = seq.LayerNorm() if layer_norm else None
+        self.conv2 = seq_conv_cls(
+            in_channels = channels + (1 if depth_variant else 0),
+            out_channels = channels,
+            kernel_size = kernel_size,
+            stride = 1,
+            pad_delta = 1)
+        self.act = nn.LeakyReLU(leak) if leak > 0 else nn.ReLU()
+
+    def forward(self, h, N, depth: int):
+        l = h
+        if self.depth_variant:
+            l = _depth_cat(l, depth)
+        l, _ = self.conv1l(l, N)
+        r = h
+        if self.norm1r is not None:
+            r = self.norm1r(r, N)
+        r = self.act(r)
+        if self.depth_variant:
+            r = _depth_cat(r, depth)
+        r, N = self.conv1r(r, N)
+        if self.norm2 is not None:
+            r = self.norm2(r, N)
+        r = self.act(r)
+        if self.depth_variant:
+            r = _depth_cat(r, depth)
+        r, _ = self.conv2(r, N)
+        return l+r, N
+
 class Reduce(nn.Module):
     def __init__(self, 
             hidden, kernel_size, stride, layers, depth_variant, 
-            leak, dropout, layer_norm):
+            preact, leak, dropout, layer_norm):
         super().__init__()
         self.hidden = hidden
         self.kernel_size = kernel_size
         self.stride = stride
         self.layers = layers
         self.depth_variant = depth_variant
+        self.preact = preact
         self.leak = leak
         self.dropout = dropout
         self.layer_norm = layer_norm
+        block = PreactBlock if preact else BasicBlock
         self.blocks = nn.ModuleList([
-            Block(
+            block(
                 seq_conv_cls = seq.Conv, 
                 channels = hidden, 
                 kernel_size = kernel_size, 
@@ -107,18 +163,20 @@ class Reduce(nn.Module):
 class Expand(nn.Module):
     def __init__(self, 
             hidden, kernel_size, stride, layers, depth_variant, 
-            leak, dropout, layer_norm):
+            preact, leak, dropout, layer_norm):
         super().__init__()
         self.hidden = hidden
         self.kernel_size = kernel_size
         self.stride = stride
         self.layers = layers
         self.depth_variant = depth_variant
+        self.preact = preact
         self.leak = leak
         self.dropout = dropout
         self.layer_norm = layer_norm
+        block = PreactBlock if preact else BasicBlock
         self.blocks = nn.ModuleList([
-            Block(
+            block(
                 seq_conv_cls = seq.ConvTranspose, 
                 channels = hidden, 
                 kernel_size = kernel_size, 
@@ -164,7 +222,7 @@ class Classify(nn.Module):
     def __init__(self,
             features, classes,
             inproj_size=7, inproj_stride=4, inproj_norm=True,
-            hidden=64, kernel_size=5, stride=2, layers=2, depth_variant=True,
+            hidden=64, kernel_size=5, stride=2, layers=2, depth_variant=True, preact=True,
             outproj_size=64,
             dropout=0.2, leak=0.0, layer_norm=True):
         super().__init__()
@@ -184,6 +242,7 @@ class Classify(nn.Module):
             layers = layers,
             depth_variant = depth_variant,
             dropout = dropout,
+            preact = preact,
             leak = leak,
             layer_norm = layer_norm)
         self.outproj_lin1 = nn.Linear(
