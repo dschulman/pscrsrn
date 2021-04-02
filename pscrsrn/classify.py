@@ -54,8 +54,7 @@ def run(hparams=None):
         model_con = model,
         data_con = d,
         loss_con = nn.CrossEntropyLoss,
-        metrics_con = lambda: Metrics(d.CATS),
-        val_every_n_epochs = 5)
+        metrics_con = lambda: Metrics(d.CATS))
 
 if __name__ == '__main__':
     run()

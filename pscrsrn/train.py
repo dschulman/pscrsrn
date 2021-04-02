@@ -140,9 +140,7 @@ def run(
                         with tqdm(val_data, desc='Val', leave=False) as bt:
                             for b, batch in enumerate(bt):
                                 x, y = _batch_to_device(batch, device)
-                                y_preds = model(x)
-                                y_preds = torch.stack(torch.chunk(y_preds, y.shape[0]))
-                                y_pred = torch.mean(y_preds, dim=1)
+                                y_pred = model(x)
                                 loss = loss_fn(y_pred, y)
                                 total_loss += loss.item()
                                 total_len += y.shape[0]

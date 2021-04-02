@@ -12,10 +12,11 @@ from tqdm.auto import tqdm
 import zipfile
 
 class Cinc2017Dataset(tud.Dataset):
-    def __init__(self, xs, y, weights, trim_min=0.5):
+    def __init__(self, xs, y, weights, trim_prob, trim_min=0.5):
         self.xs = xs
         self.y = y
         self.weights = weights
+        self.trim_prob = trim_prob
         self.trim_min = trim_min
 
     def __len__(self):
@@ -27,27 +28,11 @@ class Cinc2017Dataset(tud.Dataset):
         offset = torch.randint(length-trimmed, ()).item()
         return x[offset:(offset+trimmed)]
 
-class Cinc2017TrainDataset(Cinc2017Dataset):
-    def __init__(self, xs, y, weights, trim_prob, trim_min=0.5):
-        super().__init__(xs, y, weights, trim_min)
-        self.trim_prob = trim_prob
-
     def __getitem__(self, idx):
         x = self.xs[idx]
         if self.trim_prob and (torch.rand(()).item() < self.trim_prob):
             x = self._augment(x)
         return x, self.y[idx]
-
-class Cinc2017TestDataset(Cinc2017Dataset):
-    def __init__(self, xs, y, weights, augments, trim_min=0.5):
-        super().__init__(xs, y, weights, trim_min)
-        self.augments = augments
-
-    def __getitem__(self, idx):
-        xs = [self.xs[idx]]
-        for _ in range(self.augments):
-            xs.append(self._augment(xs[0]))
-        return xs, self.y[idx]
 
 class Cinc2017:
     CATS = ['N','A','O','~']
@@ -78,7 +63,7 @@ class Cinc2017:
             shutil.move(os.path.join(tmp_path, 'training2017'), self.path)
             shutil.rmtree(tmp_path)
 
-    def _setup(self, trim_prob, val_augments, trim_min):
+    def _setup(self, trim_prob, trim_min):
         ref_path = os.path.join(self.path, 'REFERENCE.csv')
         ref = pd.read_csv(ref_path, names=['id','label'])
         xs = []
@@ -105,19 +90,17 @@ class Cinc2017:
         train_indices.sort()
         val_indices = np.concatenate(val_indices)
         val_indices.sort()
-        train_ds = Cinc2017TrainDataset(
+        train_ds = Cinc2017Dataset(
             xs[train_indices], y[train_indices], weights[train_indices],
             trim_prob = trim_prob, trim_min = trim_min)
-        val_ds = Cinc2017TestDataset(
+        val_ds = Cinc2017Dataset(
             xs[val_indices], y[val_indices], weights[val_indices],
-            augments = val_augments, trim_min = trim_min)
+            trim_prob = 0.0, trim_min = trim_min)
         return train_ds, val_ds
 
     @staticmethod
     def _collate(batch):
         xs, ys = zip(*batch)
-        if isinstance(xs[0], list):
-            xs = sum(xs, []) ## flatten
         y = torch.tensor(ys, dtype=torch.long)
         return xs, y
 
@@ -139,9 +122,9 @@ class Cinc2017:
             shuffle = False,
             collate_fn = self._collate)
 
-    def __call__(self, batch_size, trim_prob, val_augments, trim_min, balanced_sampling):
+    def __call__(self, batch_size, trim_prob, trim_min, balanced_sampling):
         self._download()
-        train_ds, val_ds = self._setup(trim_prob, val_augments, trim_min)
+        train_ds, val_ds = self._setup(trim_prob, trim_min)
         train_dl = self._train_dataloader(train_ds, batch_size, balanced_sampling)
         val_dl = self._val_dataloader(val_ds, batch_size)
         return train_dl, val_dl
