@@ -1,0 +1,25 @@
+data:
+  batch_size: 32
+  trim_prob: 0.9
+  val_augments: 5
+  trim_min: 0.5
+  balanced_sampling: true
+model:
+  type: rsrn
+  inproj_size: 7
+  inproj_stride: 4
+  inproj_norm: true
+  hidden: 64
+  kernel_size: 5
+  stride: 2
+  layers: 2
+  depth_variant: true
+  outproj_size: 64
+  leak: 0.0
+  dropout: 0.2
+  layer_norm: true
+train:
+  epochs: 200
+  lr: 0.001
+  weight_decay: 0.01
+nparams: 130188
