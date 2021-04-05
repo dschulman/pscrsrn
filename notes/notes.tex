@@ -70,13 +70,13 @@ Here, we simply apply the \emph{same} layers (i.e. sharing weights) repeatedly u
 \draw [->] (relu1) -- (conv2);
 \node (ln2) [block, above=of conv2] {Layer Norm};
 \draw [->] (conv2) -- (ln2);
-\node (sum) [op, above=of ln2] {$+$};
+\node (relu2) [block, above=of ln2] {ReLU};
+\draw [->] (ln2) -- (relu2);
+\node (sum) [op, above=of relu2] {$+$};
 \draw [->] (conv1l) |- (sum);
-\draw [->] (ln2) -- (sum);
-\node (relu2) [block, above=of sum] {ReLU};
-\draw [->] (sum) -- (relu2);
-\node (output) [coordinate, above=of relu2] {};
-\draw [->] (relu2) -- (output);
+\draw [->] (relu2) -- (sum);
+\node (output) [coordinate, above=of sum] {};
+\draw [->] (sum) -- (output);
 \end{tikzpicture}
 \caption{A Basic Block}
 \label{fig:block}
