@@ -43,7 +43,17 @@ class Block(nn.Module):
         r, _ = self.conv2(r, N)
         if self.norm2 is not None:
             r = self.norm2(r, N)
-        return self.act(l + r), N
+        return l + self.act(r), N
+
+def _stride(layer, n_layers, stride_on):
+    if stride_on == 'all':
+        return True
+    elif stride_on == 'first':
+        return layer == 0
+    elif stride_on == 'last':
+        return layer == (n_layers - 1)
+    else:
+        raise ValueError(f'bad stride_on: {stride_on}')
 
 class Classify(nn.Module):
     def __init__(self,
@@ -51,7 +61,7 @@ class Classify(nn.Module):
             inproj_size=7, inproj_stride=4, inproj_norm=True,
             hidden=64, kernel_size=5, stride=2, layers=2,
             outproj_size=64,
-            dropout=0.2, leak=0.0, batch_norm=True):
+            stride_on='all', dropout=0.2, leak=0.0, batch_norm=True):
         super().__init__()
         self.inproj_conv = seq.Conv(
             in_channels = features,
@@ -67,10 +77,10 @@ class Classify(nn.Module):
             Block(
                 channels=hidden,
                 kernel_size=kernel_size,
-                stride=stride,
+                stride=stride if _stride(l, layers, stride_on) else 1,
                 leak=leak,
                 batch_norm=batch_norm)
-            for _ in range(layers)])
+            for l in range(layers)])
         self.outproj_lin1 = nn.Linear(
             in_features = hidden * 2,
             out_features = outproj_size)

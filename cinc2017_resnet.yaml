@@ -11,12 +11,13 @@ model:
   hidden: 64
   kernel_size: 5
   stride: 2
-  layers: 8
+  stride_on: all
+  layers: 2
   outproj_size: 64
   leak: 0.0
   dropout: 0.2
   batch_norm: True
 train:
-  epochs: 200
+  epochs: 150
   lr: 0.001
   weight_decay: 0.01
