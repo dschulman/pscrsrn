@@ -222,3 +222,40 @@ class Classify(nn.Module):
         h = self.outproj_act(h)
         z = self.outproj_lin2(h)
         return z[seq.invert_permutation(sorted_indices)]
+
+class Generate(nn.Module):
+    def __init__(self,
+            latent, features,
+            hidden=64, kernel_size=5, stride=2, layers=2, depth_variant=True,
+            stride_on='all',
+            outproj_size=5,
+            dropout=0.0, leak=0.1, layer_norm=True):
+        super().__init__()
+        self.inproj = nn.Linear(
+            in_features = latent,
+            out_features = hidden)
+        self.expand = Expand(
+            hidden = hidden, 
+            kernel_size = kernel_size, 
+            stride = stride, 
+            layers = layers, 
+            depth_variant = depth_variant, 
+            stride_on = stride_on, 
+            leak = leak, 
+            dropout = dropout, 
+            layer_norm = layer_norm)
+        self.outproj = seq.Conv(
+            in_channels = hidden,
+            out_channels = features,
+            kernel_size = outproj_size,
+            stride = 1,
+            pad_delta = 1)
+
+    def forward(self, h, N):
+        N, sorted_indices = torch.sort(N)
+        h = h[sorted_indices]
+        h = self.inproj(h)
+        h = self.expand(h, N)
+        y, _ = self.outproj(h, N)
+        y = y * seq.mask(y, N)
+        return y[seq.invert_permutation(sorted_indices)]
