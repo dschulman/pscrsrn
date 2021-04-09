@@ -3,36 +3,42 @@ import torch.nn as nn
 import torchmetrics as tmet
 from . import cm, data, resnet, rnn, rsrn, train
 
-class Metrics(nn.Module):
+class Task(train.Task):
     def __init__(self, classes):
         super().__init__()
         self.classes = classes
         n_classes = len(classes)
-        self.accuracy = tmet.Accuracy(compute_on_step=False)
-        self.f1 = tmet.F1(n_classes, average='macro', compute_on_step=False)
-        self.auc = tmet.AUROC(n_classes, average='macro', compute_on_step=False)
-        self.cm = tmet.ConfusionMatrix(n_classes, normalize='true', compute_on_step=False)
+        self.loss = nn.CrossEntropyLoss()
+        self.metrics = nn.ModuleDict({
+            "accuracy": tmet.Accuracy(compute_on_step=False),
+            "f1": tmet.F1(n_classes, average='macro', compute_on_step=False),
+            "auc": tmet.AUROC(n_classes, average='macro', compute_on_step=False),
+            "cm": tmet.ConfusionMatrix(n_classes, normalize='true', compute_on_step=False)
+        })
 
     scalars = ['accuracy','f1','auc']
 
-    def reset(self):
-        for c in self.children():
-            c.reset()
+    def start_stage(self, stage):
+        for metric in self.metrics.values():
+            metric.reset()
 
-    def forward(self, z, y):
+    def step(self, model, batch):
+        x, y = batch
+        z = model(x)
         with torch.no_grad():
             zmax = torch.argmax(z, dim=1)
-            self.accuracy(zmax, y)
-            self.f1(zmax, y)
-            self.auc(torch.softmax(z, dim=1), y)
-            self.cm(zmax, y)
+            self.metrics.accuracy(zmax, y)
+            self.metrics.f1(zmax, y)
+            self.metrics.auc(torch.softmax(z, dim=1), y)
+            self.metrics.cm(zmax, y)
+        return self.loss(z, y), y.shape[0]
 
-    def compute(self):
+    def finish_stage(self, stage):
         return {
-            'accuracy': self.accuracy.compute().item(),
-            'f1': self.f1.compute().item(),
-            'auc': self.auc.compute().item(),
-            'cm': cm.plot(self.cm.compute().cpu().numpy(), self.classes)
+            'accuracy': self.metrics.accuracy.compute().item(),
+            'f1': self.metrics.f1.compute().item(),
+            'auc': self.metrics.auc.compute().item(),
+            'cm': cm.plot(self.metrics.cm.compute().cpu().numpy(), self.classes)
         }
 
 def run(hparams=None):
@@ -53,8 +59,8 @@ def run(hparams=None):
         default_out = 'outputs',
         model_con = model,
         data_con = d,
-        loss_con = nn.CrossEntropyLoss,
-        metrics_con = lambda: Metrics(d.CATS))
+        task_con = lambda **hparams: Task(d.CATS, **hparams),
+        gpu = False)
 
 if __name__ == '__main__':
     run()

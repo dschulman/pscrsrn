@@ -5,10 +5,10 @@ import matplotlib.pyplot as plt
 import omegaconf as oc
 import os
 import torch
+import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lrs
 import torch.utils.tensorboard as tut
-import torchmetrics as tmet
 from tqdm.auto import tqdm, trange
 
 def _parse_args(hparams, default_out):
@@ -73,13 +73,24 @@ def _batch_to_device(batch, device):
     else:
         raise ValueError()
 
+class Task(nn.Module):
+    scalars = []
+
+    def start_stage(self, stage):
+        pass
+
+    def step(self, model, batch):
+        raise NotImplementedError()
+
+    def finish_stage(self, stage):
+        return {}
+
 def run(
         hparams,
         default_out,
         model_con,
         data_con,
-        loss_con,
-        metrics_con,
+        task_con,
         gpu = True,
         val_every_n_epochs = 1):
     output, hparams = _parse_args(hparams, default_out)
@@ -92,12 +103,8 @@ def run(
     oc.OmegaConf.save(hparams, os.path.join(output, 'hparams.yaml'))
     model.to(device)
     train_data, val_data = data_con(**hparams.get('data', {}))
-    loss_fn = loss_con(**hparams.get('loss', {}))
-    loss_fn.to(device)
-    train_metrics = metrics_con()
-    train_metrics.to(device)
-    val_metrics = metrics_con()
-    val_metrics.to(device)
+    task = task_con(**hparams.get('task', {}))
+    task.to(device)
     train_hparams = hparams['train']
     optimizer = optim.AdamW(
         params = model.parameters(),
@@ -105,50 +112,46 @@ def run(
         weight_decay = train_hparams['weight_decay'])
     csvpath = os.path.join(output, 'metrics.csv')
     with open(csvpath, 'w', newline='') as csvf, tut.SummaryWriter(output) as tb:
-        csvw = csv.DictWriter(csvf, ['epoch','stage','loss'] + train_metrics.scalars)
+        csvw = csv.DictWriter(csvf, ['epoch','stage','loss'] + task.scalars)
         csvw.writeheader()
-        _tboard_hparams(tb, hparams, ['loss'] + train_metrics.scalars)
+        _tboard_hparams(tb, hparams, ['loss'] + task.scalars)
         with trange(train_hparams['epochs'], desc='Epoch') as et:
             for e in et:
                 model.train()
+                task.start_stage('train')
                 total_loss = 0.0
                 total_len = 0
                 with tqdm(train_data, desc='Train', leave=False) as bt:
                     for b, batch in enumerate(bt):
-                        x, y = _batch_to_device(batch, device)
+                        batch = _batch_to_device(batch, device)
                         optimizer.zero_grad()
-                        y_pred = model(x)
-                        loss = loss_fn(y_pred, y)
+                        loss, batch_size = task.step(model, batch)
                         loss.backward()
                         optimizer.step()
                         total_loss += loss.item()
-                        total_len += y.shape[0]
+                        total_len += batch_size
                         bt.set_postfix(Loss=total_loss/total_len)
-                        train_metrics(y_pred, y)
                 train_loss = total_loss / total_len
-                train_mets = train_metrics.compute()
-                train_metrics.reset()
+                train_mets = task.finish_stage('train')
                 csvw.writerow({'epoch':e, 'stage':'train', 'loss':train_loss, **_csv_metrics(train_mets)})
                 csvf.flush()
                 tb.add_scalar('loss/train', train_loss, e)
                 _tboard_metrics(tb, train_mets, '/train', e)
                 if ((e+1) % val_every_n_epochs) == 0:
                     model.eval()
+                    task.start_stage('val')
                     with torch.no_grad():
                         total_loss = 0.0
                         total_len = 0
                         with tqdm(val_data, desc='Val', leave=False) as bt:
                             for b, batch in enumerate(bt):
-                                x, y = _batch_to_device(batch, device)
-                                y_pred = model(x)
-                                loss = loss_fn(y_pred, y)
+                                batch = _batch_to_device(batch, device)
+                                loss, batch_size = task.step(model, batch)
                                 total_loss += loss.item()
-                                total_len += y.shape[0]
+                                total_len += batch_size
                                 bt.set_postfix(Loss=total_loss/total_len)
-                                val_metrics(y_pred, y)
                     val_loss = total_loss / total_len
-                    val_mets = val_metrics.compute()
-                    val_metrics.reset()
+                    val_mets = task.finish_stage('val')
                     csvw.writerow({'epoch':e, 'stage':'val', 'loss':val_loss, **_csv_metrics(val_mets)})
                     csvf.flush()
                     tb.add_scalar('loss/val', val_loss, e)
