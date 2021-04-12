@@ -56,11 +56,12 @@ def run(hparams=None):
         raise ValueError('unknown model type: ' + mtype)
     train.run(
         hparams = hparams,
+        conf_dir = 'conf/classify',
         default_out = 'outputs',
         model_con = model,
         data_con = d,
         task_con = lambda **hparams: Task(d.CATS, **hparams),
-        gpu = False)
+        gpu = True)
 
 if __name__ == '__main__':
     run()

@@ -11,7 +11,7 @@ import torch.optim.lr_scheduler as lrs
 import torch.utils.tensorboard as tut
 from tqdm.auto import tqdm, trange
 
-def _parse_args(hparams, default_out):
+def _parse_args(hparams, conf_dir, default_out):
     if hparams is not None:
         return default_out, oc.OmegaConf.create(hparams)
     else:
@@ -27,7 +27,7 @@ def _parse_args(hparams, default_out):
             help='Hyperparameter overrides')
         args = parser.parse_args()
         hparams = oc.OmegaConf.merge(
-            oc.OmegaConf.load(args.base),
+            oc.OmegaConf.load(os.path.join(conf_dir, args.base+'.yaml')),
             oc.OmegaConf.from_cli(args.override))
         return args.out, hparams
 
@@ -87,13 +87,14 @@ class Task(nn.Module):
 
 def run(
         hparams,
+        conf_dir,
         default_out,
         model_con,
         data_con,
         task_con,
         gpu = True,
         val_every_n_epochs = 1):
-    output, hparams = _parse_args(hparams, default_out)
+    output, hparams = _parse_args(hparams, conf_dir, default_out)
     name = datetime.datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
     output = os.path.join(output, name)
     os.makedirs(output, exist_ok = True)
